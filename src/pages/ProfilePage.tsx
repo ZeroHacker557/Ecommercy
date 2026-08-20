@@ -1,5 +1,5 @@
 import type { LucideIcon } from 'lucide-react'
-import { Bell, ChevronRight, CircleHelp, ClipboardList, LogOut, MapPin, Settings, ShieldCheck, Star, UserRound } from 'lucide-react'
+import { Bell, ChevronRight, CircleHelp, ClipboardList, MapPin, Settings, ShieldCheck, Star, UserRound } from 'lucide-react'
 import { formatPrice } from '../data'
 import { IconButton } from '../components/ui/IconButton'
 import { OrderImages } from '../components/order/OrderImages'
@@ -119,17 +119,6 @@ export function ProfilePage({ orders, onNavigate, onNotify }: Props) {
             </button>
           ))}
         </div>
-        <button
-          onClick={() => onNotify('Tizimdan chiqish muvaffaqiyatli!')}
-          className="mt-6 flex w-full items-center gap-5 rounded-[25px] border p-5 text-left font-bold shadow-sm transition hover:opacity-90 active:scale-[0.99]"
-          style={{ borderColor: '#fecaca', color: '#ef4444', background: '#fff' }}
-        >
-          <span className="grid size-10 place-items-center rounded-xl" style={{ background: '#fef2f2', color: '#ef4444' }}>
-            <LogOut size={20} />
-          </span>
-          <span className="flex-1">Chiqish</span>
-          <ChevronRight />
-        </button>
       </section>
     </>
   )
