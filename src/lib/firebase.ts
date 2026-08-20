@@ -90,8 +90,10 @@ function hashString(str: string): number {
 export async function sendOrderToFirestore(order: Order) {
   try {
     const ordersRef = collection(db, 'orders')
+    // Remove undefined values
+    const cleanOrder = JSON.parse(JSON.stringify(order))
     await addDoc(ordersRef, {
-      ...order,
+      ...cleanOrder,
       createdAt: new Date().toISOString()
     })
   } catch (error) {
@@ -117,12 +119,22 @@ export async function saveUserToFirestore(user: { id: number; first_name: string
 // Subscribe to User Orders
 export function subscribeToUserOrders(userId: number, callback: (orders: Order[]) => void) {
   const ordersRef = collection(db, 'orders')
-  const q = query(ordersRef, where('userId', '==', userId), orderBy('createdAt', 'desc'))
+  // We only use 'where' to avoid requiring a composite index in Firestore.
+  // Sorting will be done on the client side.
+  const q = query(ordersRef, where('userId', '==', userId))
   
   return onSnapshot(q, (snapshot: any) => {
-    const orders = snapshot.docs.map((doc: any) => ({
+    let orders = snapshot.docs.map((doc: any) => ({
       ...doc.data()
     })) as Order[]
+    
+    // Sort by createdAt descending
+    orders.sort((a, b) => {
+      const dateA = (a as any).createdAt || ''
+      const dateB = (b as any).createdAt || ''
+      return dateB.localeCompare(dateA)
+    })
+    
     callback(orders)
   }, (error: any) => {
     console.error("Error fetching user orders:", error)
