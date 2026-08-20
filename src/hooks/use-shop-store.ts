@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { formatPrice } from '../data'
+import { subscribeToCategories, subscribeToProducts, sendOrderToFirestore } from '../lib/firebase'
 import type { AppPage, Category, Order, OrderForm, Product } from '../types/domain'
-import { fetchCategories, fetchProducts, getImageUrl, hapticFeedback, hapticSuccess, initTelegram, submitOrder as apiSubmitOrder } from '../utils/telegram'
+import { fetchCategories, fetchProducts, hapticFeedback, hapticSuccess, initTelegram, submitOrder as apiSubmitOrder } from '../utils/telegram'
 
 const ORDERS_KEY = 'shopOnlineOrders'
 const LIKES_KEY = 'shopOnlineLikes'
@@ -44,29 +45,48 @@ export function useShopStore() {
     name: '', phone: '', address: '', location: '', comment: '',
   })
 
-  // Initialize Telegram & load data
+  // Initialize Telegram & Firebase real-time subscriptions
   useEffect(() => {
     initTelegram()
-    loadData()
-  }, [])
 
-  async function loadData() {
     setLoading(true)
-    try {
-      const [prods, cats] = await Promise.all([fetchProducts(), fetchCategories()])
-      setProducts(prods)
-      setCategories(cats)
-    } catch {
-      // API not available yet
+
+    // 1. Subscribe to Firestore products
+    const unsubProds = subscribeToProducts((fbProducts) => {
+      if (fbProducts.length > 0) {
+        setProducts(fbProducts)
+        setLoading(false)
+      } else {
+        // Fallback to local HTTP API if Firestore is empty
+        fetchProducts().then((apiProds) => {
+          if (apiProds.length > 0) setProducts(apiProds)
+          setLoading(false)
+        }).catch(() => setLoading(false))
+      }
+    })
+
+    // 2. Subscribe to Firestore categories
+    const unsubCats = subscribeToCategories((fbCats) => {
+      if (fbCats.length > 0) {
+        setCategories(fbCats)
+      } else {
+        fetchCategories().then((apiCats) => {
+          if (apiCats.length > 0) setCategories(apiCats)
+        }).catch(() => {})
+      }
+    })
+
+    return () => {
+      unsubProds()
+      unsubCats()
     }
-    setLoading(false)
-  }
+  }, [])
 
   const cartCount = Object.values(cartItems).reduce((total, qty) => total + qty, 0)
 
   const cartTotal = useMemo(() => {
     return Object.entries(cartItems).reduce((sum, [id, qty]) => {
-      const p = products.find((pr) => pr.id === Number(id))
+      const p = products.find((pr) => String(pr.id) === String(id))
       return sum + (p ? p.price * qty : 0)
     }, 0)
   }, [cartItems, products])
@@ -74,7 +94,7 @@ export function useShopStore() {
   const cartProducts = useMemo(() => {
     return Object.entries(cartItems)
       .map(([id, qty]) => {
-        const p = products.find((pr) => pr.id === Number(id))
+        const p = products.find((pr) => String(pr.id) === String(id))
         return p ? { product: p, quantity: qty } : null
       })
       .filter(Boolean) as { product: Product; quantity: number }[]
@@ -162,7 +182,7 @@ export function useShopStore() {
       customer: { ...orderForm },
     }
 
-    // Send to API
+    // Send to Firestore & API
     const orderPayload = {
       customer: orderForm,
       products: cartProducts.map((item) => ({
@@ -175,7 +195,10 @@ export function useShopStore() {
       totalFormatted: formatPrice(cartTotal),
     }
 
-    await apiSubmitOrder(orderPayload)
+    await Promise.all([
+      sendOrderToFirestore(newOrder),
+      apiSubmitOrder(orderPayload).catch(() => {})
+    ])
 
     // Save locally
     const updated = [newOrder, ...myOrders]
@@ -205,6 +228,6 @@ export function useShopStore() {
     openCart, closeCart, goToCheckout,
     updateOrderForm, submitOrder,
     notify, clearToast: () => setToast(null),
-    refreshData: loadData,
+    refreshData: () => {},
   }
 }

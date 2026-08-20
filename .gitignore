@@ -1,0 +1,27 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Directory for instrumented code leveraged by Istanbul
+coverage
+
+# Dependency directories
+node_modules/
+
+# Production build
+dist/
+
+# Firebase private keys
+*-firebase-adminsdk-*.json
+*.pem
+
+# Environment variables
+.env
+.env.local

@@ -5,7 +5,7 @@ import os
 import json
 from aiohttp import web
 from config import API_HOST, API_PORT, IMAGES_DIR
-import database as db
+import firebase_db as db
 
 
 async def handle_get_products(request):

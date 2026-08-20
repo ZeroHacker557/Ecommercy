@@ -17,7 +17,7 @@ from aiogram.client.default import DefaultBotProperties
 from config import BOT_TOKEN, ADMIN_ID, MINI_APP_URL
 from admin import router as admin_router
 from api import start_api
-import database as db
+import firebase_db as db
 
 # Logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")

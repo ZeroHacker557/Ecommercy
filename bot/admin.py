@@ -12,7 +12,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 
 from config import ADMIN_ID, IMAGES_DIR
-import database as db
+import firebase_db as db
 
 router = Router()
 
@@ -164,7 +164,7 @@ async def process_category_name(message: Message, state: FSMContext):
 async def cb_delete_category(callback: CallbackQuery):
     if not is_admin(callback.from_user.id):
         return
-    cat_id = int(callback.data.split("_")[-1])
+    cat_id = callback.data.split("cat_del_")[-1]
     cat = db.get_category_by_id(cat_id)
     name = cat["name"] if cat else "Noma'lum"
     db.delete_category(cat_id)
@@ -214,7 +214,7 @@ async def cb_products(callback: CallbackQuery):
 async def cb_view_product(callback: CallbackQuery, bot: Bot):
     if not is_admin(callback.from_user.id):
         return
-    prod_id = int(callback.data.split("_")[-1])
+    prod_id = callback.data.split("prod_view_")[-1]
     p = db.get_product_by_id(prod_id)
     if not p:
         await callback.answer("Mahsulot topilmadi")
@@ -261,7 +261,7 @@ async def cb_view_product(callback: CallbackQuery, bot: Bot):
 async def cb_delete_product(callback: CallbackQuery):
     if not is_admin(callback.from_user.id):
         return
-    prod_id = int(callback.data.split("_")[-1])
+    prod_id = callback.data.split("prod_del_")[-1]
     p = db.get_product_by_id(prod_id)
     name = p["name"] if p else "Noma'lum"
     db.delete_product(prod_id)
@@ -302,7 +302,7 @@ async def cb_add_product_start(callback: CallbackQuery, state: FSMContext):
 async def cb_add_product_category(callback: CallbackQuery, state: FSMContext):
     if not is_admin(callback.from_user.id):
         return
-    cat_id = int(callback.data.split("_")[-1])
+    cat_id = callback.data.split("addprod_cat_")[-1]
     cat = db.get_category_by_id(cat_id)
     if not cat:
         await callback.answer("Kategoriya topilmadi")
