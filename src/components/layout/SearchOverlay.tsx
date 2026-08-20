@@ -1,4 +1,6 @@
-import { ArrowLeft, Search } from 'lucide-react'
+import { ArrowLeft, Search, ShoppingBag } from 'lucide-react'
+import { formatPrice } from '../../data'
+import { getImageUrl } from '../../utils/telegram'
 import type { Product } from '../../types/domain'
 
 type Props = {
@@ -23,12 +25,13 @@ export function SearchOverlay({ query, results, onQueryChange, onClose, onOpenPr
             <ArrowLeft />
           </button>
           <div className="flex flex-1 items-center gap-2 rounded-2xl px-4" style={{ background: '#f8fafc' }}>
-            <Search className="shrink-0" style={{ color: '#94a3b8' }} />
+            <Search style={{ color: '#94a3b8' }} />
             <input
+              type="search"
               autoFocus
               value={query}
-              onChange={(event) => onQueryChange(event.target.value)}
-              placeholder="Mahsulot qidiring..."
+              onChange={(e) => onQueryChange(e.target.value)}
+              placeholder="Qidirish..."
               className="h-12 w-full bg-transparent outline-none"
               style={{ color: '#111426' }}
             />
@@ -51,10 +54,16 @@ export function SearchOverlay({ query, results, onQueryChange, onClose, onOpenPr
               className="flex items-center gap-3 rounded-2xl border p-3 text-left transition hover:shadow-sm active:scale-[0.98]"
               style={{ borderColor: '#f1f5f9', color: '#111426', animation: `fadeInUp 0.3s ease ${i * 0.05}s both` }}
             >
-              <img className="size-16 rounded-xl object-contain" src={product.image} alt={product.name} />
+              {product.images?.[0] ? (
+                <img className="size-16 rounded-xl object-contain" src={getImageUrl(product.images[0])} alt={product.name} />
+              ) : (
+                <div className="grid size-16 place-items-center rounded-xl" style={{ background: '#f8fafc', color: '#cbd5e1' }}>
+                  <ShoppingBag size={20} />
+                </div>
+              )}
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-sm font-bold" style={{ color: '#111426' }}>{product.name}</span>
-                <small className="mt-1 block font-bold" style={{ color: '#7c3aed' }}>{product.price}</small>
+                <small className="mt-1 block font-bold" style={{ color: '#7c3aed' }}>{formatPrice(product.price)}</small>
               </span>
             </button>
           ))}
