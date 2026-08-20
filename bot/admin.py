@@ -58,6 +58,12 @@ def back_to_menu_kb():
     ])
 
 
+def skip_kb(next_step: str):
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="⏭ O'tkazib yuborish", callback_data=f"skip_{next_step}")]
+    ])
+
+
 # ─── Admin Menu ──────────────────────────────────────────────
 
 @router.message(F.text == "/admin")
@@ -345,7 +351,22 @@ async def process_product_price(message: Message, state: FSMContext):
     await state.set_state(AddProduct.old_price)
     await message.answer(
         f"✅ Narx: <b>{db.format_price(price)}</b>\n\n"
-        f"4️⃣ Eski narx (chegirma uchun). Yo'q bo'lsa <b>-</b> yozing:",
+        f"4️⃣ Eski narxni kiriting (chegirma uchun).",
+        reply_markup=skip_kb("old_price"),
+        parse_mode="HTML"
+    )
+
+
+@router.callback_query(F.data == "skip_old_price")
+async def cb_skip_old_price(callback: CallbackQuery, state: FSMContext):
+    if not is_admin(callback.from_user.id):
+        return
+    await state.update_data(oldPrice=None)
+    await state.set_state(AddProduct.description)
+    await callback.message.edit_text(callback.message.html_text)
+    await callback.message.answer(
+        "5️⃣ Mahsulot tavsifini yozing:",
+        reply_markup=skip_kb("desc"),
         parse_mode="HTML"
     )
 
@@ -360,12 +381,27 @@ async def process_old_price(message: Message, state: FSMContext):
         try:
             old_price = int(text.replace(" ", "").replace(",", ""))
         except ValueError:
-            await message.answer("❌ Faqat raqam yoki - kiriting!")
+            await message.answer("❌ Faqat raqam kiriting!")
             return
     await state.update_data(oldPrice=old_price)
     await state.set_state(AddProduct.description)
     await message.answer(
-        "5️⃣ Mahsulot tavsifini yozing.\nYo'q bo'lsa <b>-</b> yozing:",
+        "5️⃣ Mahsulot tavsifini yozing:",
+        reply_markup=skip_kb("desc"),
+        parse_mode="HTML"
+    )
+
+
+@router.callback_query(F.data == "skip_desc")
+async def cb_skip_desc(callback: CallbackQuery, state: FSMContext):
+    if not is_admin(callback.from_user.id):
+        return
+    await state.update_data(description="")
+    await state.set_state(AddProduct.sizes)
+    await callback.message.edit_text(callback.message.html_text)
+    await callback.message.answer(
+        "6️⃣ Razmerlarni vergul bilan yozing.\nMasalan: <code>S, M, L, XL</code>",
+        reply_markup=skip_kb("sizes"),
         parse_mode="HTML"
     )
 
@@ -379,9 +415,22 @@ async def process_description(message: Message, state: FSMContext):
     await state.update_data(description=desc)
     await state.set_state(AddProduct.sizes)
     await message.answer(
-        "6️⃣ Razmerlarni vergul bilan yozing.\n"
-        "Masalan: <code>S, M, L, XL</code>\n"
-        "Yo'q bo'lsa <b>-</b> yozing:",
+        "6️⃣ Razmerlarni vergul bilan yozing.\nMasalan: <code>S, M, L, XL</code>",
+        reply_markup=skip_kb("sizes"),
+        parse_mode="HTML"
+    )
+
+
+@router.callback_query(F.data == "skip_sizes")
+async def cb_skip_sizes(callback: CallbackQuery, state: FSMContext):
+    if not is_admin(callback.from_user.id):
+        return
+    await state.update_data(sizes=[])
+    await state.set_state(AddProduct.color)
+    await callback.message.edit_text(callback.message.html_text)
+    await callback.message.answer(
+        "7️⃣ Rangni yozing.\nMasalan: <code>Qora</code>",
+        reply_markup=skip_kb("color"),
         parse_mode="HTML"
     )
 
@@ -395,8 +444,22 @@ async def process_sizes(message: Message, state: FSMContext):
     await state.update_data(sizes=sizes)
     await state.set_state(AddProduct.color)
     await message.answer(
-        "7️⃣ Rangni yozing.\nMasalan: <code>Qora</code>\n"
-        "Yo'q bo'lsa <b>-</b> yozing:",
+        "7️⃣ Rangni yozing.\nMasalan: <code>Qora</code>",
+        reply_markup=skip_kb("color"),
+        parse_mode="HTML"
+    )
+
+
+@router.callback_query(F.data == "skip_color")
+async def cb_skip_color(callback: CallbackQuery, state: FSMContext):
+    if not is_admin(callback.from_user.id):
+        return
+    await state.update_data(color="")
+    await state.set_state(AddProduct.discount)
+    await callback.message.edit_text(callback.message.html_text)
+    await callback.message.answer(
+        "8️⃣ Chegirma foizini yozing.\nMasalan: <code>-20%</code>",
+        reply_markup=skip_kb("discount"),
         parse_mode="HTML"
     )
 
@@ -410,9 +473,21 @@ async def process_color(message: Message, state: FSMContext):
     await state.update_data(color=color)
     await state.set_state(AddProduct.discount)
     await message.answer(
-        "8️⃣ Chegirma foizini yozing.\n"
-        "Masalan: <code>-20%</code>\n"
-        "Yo'q bo'lsa <b>-</b> yozing:",
+        "8️⃣ Chegirma foizini yozing.\nMasalan: <code>-20%</code>",
+        reply_markup=skip_kb("discount"),
+        parse_mode="HTML"
+    )
+
+
+@router.callback_query(F.data == "skip_discount")
+async def cb_skip_discount(callback: CallbackQuery, state: FSMContext):
+    if not is_admin(callback.from_user.id):
+        return
+    await state.update_data(discount="")
+    await state.set_state(AddProduct.image)
+    await callback.message.edit_text(callback.message.html_text)
+    await callback.message.answer(
+        "9️⃣ Mahsulot rasmini yuboring (foto sifatida).\nBu asosiy rasm bo'ladi:",
         parse_mode="HTML"
     )
 
@@ -426,8 +501,7 @@ async def process_discount(message: Message, state: FSMContext):
     await state.update_data(discount=discount)
     await state.set_state(AddProduct.image)
     await message.answer(
-        "9️⃣ Mahsulot rasmini yuboring (foto sifatida).\n"
-        "Bu asosiy rasm bo'ladi:",
+        "9️⃣ Mahsulot rasmini yuboring (foto sifatida).\nBu asosiy rasm bo'ladi:",
         parse_mode="HTML"
     )
 

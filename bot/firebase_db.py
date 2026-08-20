@@ -152,3 +152,53 @@ def add_category(name: str):
 def delete_category(cat_id: str | int):
     db.collection("categories").document(str(cat_id)).delete()
     print(f"[DEL] Firebase: Kategoriya o'chirildi ({cat_id})")
+
+
+# ─── Orders ───────────────────────────────────────────────
+
+def update_order_status(order_id: str, new_status: str):
+    try:
+        # Check if it's the custom string ID like #1234567 or the document ID
+        # Search by 'id' field
+        docs = db.collection("orders").where("id", "==", order_id).get()
+        for doc in docs:
+            doc.reference.update({"status": new_status})
+            print(f"[OK] Order {order_id} status updated to {new_status}")
+            return True
+        return False
+    except Exception as e:
+        print(f"[ERR] Failed to update order status: {e}")
+        return False
+
+
+def listen_to_new_orders(callback):
+    """
+    Listens for new orders in Firestore and triggers the callback.
+    callback function should accept one argument: order_data (dict)
+    """
+    import threading
+
+    def on_snapshot(col_snapshot, changes, read_time):
+        for change in changes:
+            if change.type.name == 'ADDED':
+                order_data = change.document.to_dict()
+                order_data['_doc_id'] = change.document.id
+                
+                # Check if this is a newly created order (within the last few minutes)
+                # We skip old orders to avoid spamming on bot restart
+                from datetime import datetime, timezone
+                import dateutil.parser
+                
+                try:
+                    if 'createdAt' in order_data:
+                        created_dt = dateutil.parser.isoparse(order_data['createdAt'])
+                        now = datetime.now(timezone.utc)
+                        diff = (now - created_dt).total_seconds()
+                        if diff < 120: # 2 minutes
+                            callback(order_data)
+                except Exception as e:
+                    print(f"Error parsing order date: {e}")
+
+    # Watch the collection
+    orders_watch = db.collection("orders").on_snapshot(on_snapshot)
+    return orders_watch

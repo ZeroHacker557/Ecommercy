@@ -55,25 +55,39 @@ async def notify_admin_order(order_data: dict):
     try:
         customer = order_data.get("customer", {})
         products = order_data.get("products", [])
-        total = order_data.get("totalFormatted", "—")
+        total = order_data.get("total", "—")
+        if isinstance(total, (int, float)):
+            total = db.format_price(total)
+        else:
+            total = order_data.get("totalFormatted", "—")
+            
+        order_id = order_data.get("id", "Noma'lum")
+        user_name = order_data.get("username", customer.get("name", "—"))
 
-        text = "🛍 <b>YANGI BUYURTMA KELDI!</b>\n"
+        text = f"🛍 <b>YANGI BUYURTMA KELDI! ({order_id})</b>\n"
         text += "━" * 22 + "\n\n"
-        text += f"👤 <b>Mijoz:</b> {customer.get('name', '—')}\n"
+        text += f"👤 <b>Mijoz:</b> {user_name}\n"
         text += f"📞 <b>Telefon:</b> <code>{customer.get('phone', '—')}</code>\n"
         text += f"📍 <b>Manzil:</b> {customer.get('address', '—')}\n"
 
         if customer.get("location"):
-            text += f"📌 <b>Lokatsiya:</b> {customer['location']}\n"
+            lat = customer["location"].get("lat")
+            lng = customer["location"].get("lng")
+            if lat and lng:
+                map_url = f"https://www.google.com/maps?q={lat},{lng}"
+                text += f"📌 <b>Lokatsiya:</b> <a href='{map_url}'>Xaritada ko'rish</a>\n"
+        
         if customer.get("comment"):
             text += f"💬 <b>Izoh:</b> {customer['comment']}\n"
 
         text += "\n📦 <b>Buyurtma qilingan mahsulotlar:</b>\n"
         for i, p in enumerate(products, 1):
             qty = p.get("quantity", 1)
-            item_total = db.format_price(p.get("price", 0) * qty)
-            text += f"  <b>{i}. {p.get('name', '—')}</b>\n"
-            text += f"     └ {qty} ta × {db.format_price(p.get('price', 0))} = <b>{item_total}</b>\n"
+            # handle both nested {product: {}, quantity: 1} and flat {id, name, price, quantity} structures
+            prod_info = p.get("product", p)
+            item_total = db.format_price(prod_info.get("price", 0) * qty)
+            text += f"  <b>{i}. {prod_info.get('name', '—')}</b>\n"
+            text += f"     └ {qty} ta × {db.format_price(prod_info.get('price', 0))} = <b>{item_total}</b>\n"
 
         text += "\n" + "━" * 22 + "\n"
         text += f"💰 <b>Jami summa: {total}</b>\n"
@@ -81,33 +95,43 @@ async def notify_admin_order(order_data: dict):
 
         kb = InlineKeyboardMarkup(inline_keyboard=[
             [
-                InlineKeyboardButton(text="✅ Qabul qilindi", callback_data="order_status_accept"),
-                InlineKeyboardButton(text="🚚 Yetkazilmoqda", callback_data="order_status_delivering")
+                InlineKeyboardButton(text="✅ Qabul qilish", callback_data=f"os:Qabul qilindi:{order_id}"),
+                InlineKeyboardButton(text="🚚 Yetkazish", callback_data=f"os:Yetkazilmoqda:{order_id}")
             ],
             [
-                InlineKeyboardButton(text="🎉 Bajarildi", callback_data="order_status_done"),
-                InlineKeyboardButton(text="❌ Bekor qilish", callback_data="order_status_cancel")
+                InlineKeyboardButton(text="🎉 Bajarildi", callback_data=f"os:Yetkazildi:{order_id}"),
+                InlineKeyboardButton(text="❌ Rad etish", callback_data=f"os:Rad etildi:{order_id}")
             ]
         ])
 
-        await bot.send_message(ADMIN_ID, text, reply_markup=kb)
-        logger.info(f"[OK] Buyurtma adminga yuborildi: {customer.get('name')}")
+        await bot.send_message(ADMIN_ID, text, reply_markup=kb, disable_web_page_preview=True)
+        logger.info(f"[OK] Buyurtma adminga yuborildi: {order_id}")
     except Exception as e:
         logger.error(f"[ERR] Buyurtma xabari yuborishda xato: {e}")
 
 
-@dp.callback_query(F.data.startswith("order_status_"))
+@dp.callback_query(F.data.startswith("os:"))
 async def cb_order_status(callback: CallbackQuery):
     if callback.from_user.id != ADMIN_ID:
         return
-    status_map = {
-        "order_status_accept": "🟢 Qabul qilindi",
-        "order_status_delivering": "🚚 Yetkazilmoqda",
-        "order_status_done": "🎉 Bajarildi",
-        "order_status_cancel": "🔴 Bekor qilindi",
+        
+    _, status, order_id = callback.data.split(":", 2)
+    
+    # Update in Firestore
+    updated = db.update_order_status(order_id, status)
+    if not updated:
+        await callback.answer("❌ Firestore'da yangilashda xatolik yuz berdi", show_alert=True)
+        return
+        
+    status_emoji_map = {
+        "Qabul qilindi": "🟢",
+        "Yetkazilmoqda": "🚚",
+        "Yetkazildi": "🎉",
+        "Rad etildi": "🔴",
+        "Bekor qilingan": "🔴",
     }
-    action = callback.data
-    status_text = status_map.get(action, "Status o'zgardi")
+    emoji = status_emoji_map.get(status, "ℹ️")
+    status_text = f"{emoji} {status}"
 
     current_text = callback.message.html_text
     if "⏰ <b>Status:</b>" in current_text:
@@ -115,8 +139,8 @@ async def cb_order_status(callback: CallbackQuery):
     else:
         new_text = current_text + f"\n\n⏰ <b>Status:</b> {status_text}"
 
-    await callback.message.edit_text(new_text, reply_markup=callback.message.reply_markup)
-    await callback.answer(f"Status o'zgartirildi: {status_text}")
+    await callback.message.edit_text(new_text, reply_markup=callback.message.reply_markup, disable_web_page_preview=True)
+    await callback.answer(f"Status o'zgartirildi: {status}")
 
 
 # ─── Start Command ───────────────────────────────────────────
@@ -216,11 +240,22 @@ async def main():
     api_runner = await start_api(order_callback=notify_admin_order)
     logger.info("[API] Server ishga tushdi")
 
+    # Start Firestore order listener
+    loop = asyncio.get_running_loop()
+    
+    def on_new_order(order_data):
+        # Fire async callback from sync thread
+        asyncio.run_coroutine_threadsafe(notify_admin_order(order_data), loop)
+        
+    order_watch = db.listen_to_new_orders(on_new_order)
+    logger.info("[FIRESTORE] Real-time orders listener ishga tushdi")
+
     # Start bot
     logger.info("[BOT] Ishga tushmoqda...")
     try:
         await dp.start_polling(bot)
     finally:
+        order_watch.unsubscribe()
         await api_runner.cleanup()
         await bot.session.close()
 
