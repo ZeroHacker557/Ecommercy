@@ -116,44 +116,8 @@ export function hapticSuccess() {
   }
 }
 
-// API base URL — will be the bot's API
-const API_BASE = 'http://localhost:8080'
-
-export async function fetchProducts() {
-  try {
-    const res = await fetch(`${API_BASE}/api/products`)
-    if (!res.ok) return []
-    return await res.json()
-  } catch {
-    return []
-  }
-}
-
-export async function fetchCategories() {
-  try {
-    const res = await fetch(`${API_BASE}/api/categories`)
-    if (!res.ok) return []
-    return await res.json()
-  } catch {
-    return []
-  }
-}
-
-export async function submitOrder(orderData: unknown) {
-  try {
-    const res = await fetch(`${API_BASE}/api/orders`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(orderData),
-    })
-    return res.ok
-  } catch {
-    return false
-  }
-}
-
 // Product image URL builder
 export function getImageUrl(path: string): string {
   if (path.startsWith('http')) return path
-  return `${API_BASE}/images/${path}`
+  return path
 }

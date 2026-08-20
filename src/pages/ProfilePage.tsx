@@ -46,8 +46,12 @@ export function ProfilePage({ orders, onNavigate, onNotify }: Props) {
         className="mx-5 mt-8 flex items-center gap-5 rounded-[28px] p-6 sm:mx-10"
         style={{ background: 'linear-gradient(135deg, #f5f0ff, #fbf9ff)', animation: 'fadeInUp 0.5s ease' }}
       >
-        <div className="grid size-20 place-items-center rounded-full" style={{ background: '#ede9fe', color: '#7c3aed' }}>
-          <UserRound size={42} fill="currentColor" />
+        <div className="grid size-20 place-items-center rounded-full overflow-hidden" style={{ background: '#ede9fe', color: '#7c3aed' }}>
+          {tgUser?.photo_url ? (
+            <img src={tgUser.photo_url} alt="Profile" className="size-full object-cover" />
+          ) : (
+            <UserRound size={42} fill="currentColor" />
+          )}
         </div>
         <div className="min-w-0 flex-1">
           <h2 className="truncate text-xl font-extrabold sm:text-2xl" style={{ color: '#111426' }}>{userName}</h2>

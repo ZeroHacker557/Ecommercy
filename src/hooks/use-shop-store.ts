@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { formatPrice } from '../data'
-import { subscribeToCategories, subscribeToProducts, sendOrderToFirestore } from '../lib/firebase'
+import { subscribeToCategories, subscribeToProducts, sendOrderToFirestore, saveUserToFirestore, subscribeToUserOrders } from '../lib/firebase'
 import type { AppPage, Category, Order, OrderForm, Product } from '../types/domain'
-import { hapticFeedback, hapticSuccess, initTelegram, submitOrder as apiSubmitOrder } from '../utils/telegram'
+import { hapticFeedback, hapticSuccess, initTelegram, getTelegramUser } from '../utils/telegram'
 
 const ORDERS_KEY = 'shopOnlineOrders'
 const LIKES_KEY = 'shopOnlineLikes'
@@ -42,13 +42,19 @@ export function useShopStore() {
   const [myOrders, setMyOrders] = useState<Order[]>(loadOrders)
   const [checkoutDone, setCheckoutDone] = useState(false)
   const [orderForm, setOrderForm] = useState<OrderForm>({
-    name: '', phone: '', address: '', location: '', comment: '',
+    name: '', phone: '', address: '', location: null, comment: '',
   })
 
   // Initialize Telegram & Firebase real-time subscriptions
   useEffect(() => {
     initTelegram()
     setLoading(true)
+
+    // Handle User
+    const tgUser = getTelegramUser()
+    if (tgUser) {
+      saveUserToFirestore(tgUser)
+    }
 
     // 1. Subscribe to Firestore products
     const unsubProds = subscribeToProducts(
@@ -69,9 +75,18 @@ export function useShopStore() {
       () => {}
     )
 
+    // 3. Subscribe to User Orders
+    let unsubOrders: (() => void) | undefined
+    if (tgUser) {
+      unsubOrders = subscribeToUserOrders(tgUser.id, (orders) => {
+        setMyOrders(orders)
+      })
+    }
+
     return () => {
       unsubProds()
       unsubCats()
+      if (unsubOrders) unsubOrders()
     }
   }, [])
 
@@ -152,7 +167,7 @@ export function useShopStore() {
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }, [])
 
-  const updateOrderForm = useCallback((field: keyof OrderForm, value: string) => {
+  const updateOrderForm = useCallback((field: keyof OrderForm, value: any) => {
     setOrderForm((prev) => ({ ...prev, [field]: value }))
   }, [])
 
@@ -165,6 +180,8 @@ export function useShopStore() {
     const now = new Date()
     const months = ['Yan', 'Fev', 'Mar', 'Apr', 'May', 'Iyun', 'Iyul', 'Avg', 'Sen', 'Okt', 'Noy', 'Dek']
     const dateStr = `${now.getDate()} ${months[now.getMonth()]}, ${now.getFullYear()} • ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`
+    
+    const tgUser = getTelegramUser()
 
     const newOrder: Order = {
       id: `#${Date.now().toString().slice(-7)}`,
@@ -173,41 +190,23 @@ export function useShopStore() {
       total: cartTotal,
       status: 'Yangi',
       customer: { ...orderForm },
+      userId: tgUser?.id,
+      username: tgUser?.username || tgUser?.first_name,
     }
 
-    // Send to Firestore & API
-    const orderPayload = {
-      customer: orderForm,
-      products: cartProducts.map((item) => ({
-        id: item.product.id,
-        name: item.product.name,
-        price: item.product.price,
-        quantity: item.quantity,
-      })),
-      total: cartTotal,
-      totalFormatted: formatPrice(cartTotal),
-    }
-
-    await Promise.all([
-      sendOrderToFirestore(newOrder),
-      apiSubmitOrder(orderPayload).catch(() => {})
-    ])
-
-    // Save locally
-    const updated = [newOrder, ...myOrders]
-    setMyOrders(updated)
-    saveOrders(updated)
+    // Send to Firestore
+    await sendOrderToFirestore(newOrder)
 
     // Reset
     setCartItems({})
-    setOrderForm({ name: '', phone: '', address: '', location: '', comment: '' })
+    setOrderForm({ name: '', phone: '', address: '', location: null, comment: '' })
     setCheckoutDone(true)
     hapticSuccess()
     notify('Buyurtma muvaffaqiyatli berildi! ✓')
     setTimeout(() => setCheckoutDone(false), 4000)
 
     return true
-  }, [orderForm, cartProducts, cartTotal, myOrders, notify])
+  }, [orderForm, cartProducts, cartTotal, notify])
 
   return {
     page, products, categories, loading,

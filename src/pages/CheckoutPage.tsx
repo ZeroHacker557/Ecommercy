@@ -1,30 +1,84 @@
-import { ArrowLeft, MapPin, MessageSquare, Phone, Send, ShoppingBag, User } from 'lucide-react'
+import { useState } from 'react'
+import { ArrowLeft, MapPin, MessageSquare, Phone, Send, ShoppingBag, User, Navigation } from 'lucide-react'
+import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet'
 import { formatPrice } from '../data'
-import { getImageUrl } from '../utils/telegram'
+import { getImageUrl, hapticFeedback } from '../utils/telegram'
 import type { OrderForm, Product } from '../types/domain'
+import L from 'leaflet'
+
+// Fix Leaflet default icon issue
+import icon from 'leaflet/dist/images/marker-icon.png'
+import iconShadow from 'leaflet/dist/images/marker-shadow.png'
+let DefaultIcon = L.icon({
+  iconUrl: icon,
+  shadowUrl: iconShadow,
+  iconSize: [25, 41],
+  iconAnchor: [12, 41]
+})
+L.Marker.prototype.options.icon = DefaultIcon
 
 type Props = {
   cartProducts: { product: Product; quantity: number }[]
   cartTotal: number
   orderForm: OrderForm
-  onUpdateForm: (field: keyof OrderForm, value: string) => void
+  onUpdateForm: (field: keyof OrderForm, value: any) => void
   onSubmit: () => Promise<boolean>
   onBack: () => void
 }
 
-export function CheckoutPage({ cartProducts, cartTotal, orderForm, onUpdateForm, onSubmit, onBack }: Props) {
-  const handleSubmit = async () => {
-    const success = await onSubmit()
-    // Navigation handled by store
+function LocationPicker({ location, onChange }: { location: { lat: number; lng: number } | null, onChange: (loc: { lat: number; lng: number }) => void }) {
+  const [mapCenter] = useState<{ lat: number; lng: number }>(location || { lat: 41.2995, lng: 69.2401 }) // Default: Tashkent
+
+  const MapEvents = () => {
+    useMapEvents({
+      click(e) {
+        onChange(e.latlng)
+        hapticFeedback('light')
+      },
+    })
+    return null
   }
 
-  const fields: { key: keyof OrderForm; label: string; icon: typeof User; placeholder: string; type?: string; required?: boolean }[] = [
-    { key: 'name', label: 'Ismingiz', icon: User, placeholder: 'To\'liq ismingizni kiriting', required: true },
-    { key: 'phone', label: 'Telefon raqam', icon: Phone, placeholder: '+998 90 123 45 67', type: 'tel', required: true },
-    { key: 'address', label: 'Manzil', icon: MapPin, placeholder: 'Yetkazib berish manzilingiz', required: true },
-    { key: 'location', label: 'Lokatsiya (ixtiyoriy)', icon: MapPin, placeholder: 'Mo\'ljal yoki qo\'shimcha ma\'lumot' },
-    { key: 'comment', label: 'Izoh (ixtiyoriy)', icon: MessageSquare, placeholder: 'Qo\'shimcha izoh...' },
-  ]
+  const handleCurrentLocation = () => {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          onChange({ lat: pos.coords.latitude, lng: pos.coords.longitude })
+          hapticFeedback('medium')
+        },
+        () => alert("Lokatsiyani aniqlab bo'lmadi")
+      )
+    }
+  }
+
+  return (
+    <div className="relative mt-2 h-[240px] w-full overflow-hidden rounded-2xl border" style={{ borderColor: '#e2e8f0' }}>
+      <MapContainer center={mapCenter} zoom={12} style={{ height: '100%', width: '100%', zIndex: 1 }}>
+        <TileLayer
+          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        />
+        {location && <Marker position={location} />}
+        <MapEvents />
+      </MapContainer>
+      
+      <button 
+        type="button"
+        onClick={handleCurrentLocation}
+        className="absolute bottom-4 right-4 z-[400] grid size-10 place-items-center rounded-xl bg-white shadow-md transition hover:scale-105 active:scale-95"
+        style={{ color: '#7c3aed' }}
+      >
+        <Navigation size={20} />
+      </button>
+    </div>
+  )
+}
+
+export function CheckoutPage({ cartProducts, cartTotal, orderForm, onUpdateForm, onSubmit, onBack }: Props) {
+  const handleSubmit = async () => {
+    await onSubmit()
+    // Navigation handled by store
+  }
 
   const isValid = orderForm.name.trim() && orderForm.phone.trim() && orderForm.address.trim()
 
@@ -77,38 +131,88 @@ export function CheckoutPage({ cartProducts, cartTotal, orderForm, onUpdateForm,
         {/* Order Form */}
         <section className="mt-6" style={{ animation: 'fadeInUp 0.4s ease 0.1s both' }}>
           <h3 className="mb-4 font-bold" style={{ color: '#111426' }}>Yetkazib berish ma'lumotlari</h3>
-          <div className="space-y-4">
-            {fields.map(({ key, label, icon: Icon, placeholder, type, required }) => (
-              <div key={key}>
-                <label className="mb-1.5 block text-sm font-bold" style={{ color: '#334155' }}>
-                  {label} {required && <span style={{ color: '#ef4444' }}>*</span>}
-                </label>
-                <div className="flex items-center gap-3 rounded-2xl border px-4 py-3 transition-all focus-within:border-violet-300 focus-within:shadow-md focus-within:shadow-violet-100"
-                  style={{ borderColor: '#e2e8f0', background: '#fafafa' }}
-                >
-                  <Icon size={20} style={{ color: '#94a3b8' }} className="shrink-0" />
-                  {key === 'comment' ? (
-                    <textarea
-                      value={orderForm[key]}
-                      onChange={(e) => onUpdateForm(key, e.target.value)}
-                      placeholder={placeholder}
-                      rows={3}
-                      className="w-full resize-none bg-transparent text-sm outline-none"
-                      style={{ color: '#111426' }}
-                    />
-                  ) : (
-                    <input
-                      value={orderForm[key]}
-                      onChange={(e) => onUpdateForm(key, e.target.value)}
-                      placeholder={placeholder}
-                      type={type || 'text'}
-                      className="h-6 w-full bg-transparent text-sm outline-none"
-                      style={{ color: '#111426' }}
-                    />
-                  )}
-                </div>
+          <div className="space-y-5">
+            {/* Name */}
+            <div>
+              <label className="mb-1.5 block text-sm font-bold" style={{ color: '#334155' }}>
+                Ismingiz <span style={{ color: '#ef4444' }}>*</span>
+              </label>
+              <div className="flex items-center gap-3 rounded-2xl border px-4 py-3 transition-all focus-within:border-violet-300 focus-within:shadow-md focus-within:shadow-violet-100" style={{ borderColor: '#e2e8f0', background: '#fafafa' }}>
+                <User size={20} style={{ color: '#94a3b8' }} className="shrink-0" />
+                <input
+                  value={orderForm.name}
+                  onChange={(e) => onUpdateForm('name', e.target.value)}
+                  placeholder="To'liq ismingizni kiriting"
+                  className="h-6 w-full bg-transparent text-sm outline-none"
+                  style={{ color: '#111426' }}
+                />
               </div>
-            ))}
+            </div>
+
+            {/* Phone */}
+            <div>
+              <label className="mb-1.5 block text-sm font-bold" style={{ color: '#334155' }}>
+                Telefon raqam <span style={{ color: '#ef4444' }}>*</span>
+              </label>
+              <div className="flex items-center gap-3 rounded-2xl border px-4 py-3 transition-all focus-within:border-violet-300 focus-within:shadow-md focus-within:shadow-violet-100" style={{ borderColor: '#e2e8f0', background: '#fafafa' }}>
+                <Phone size={20} style={{ color: '#94a3b8' }} className="shrink-0" />
+                <input
+                  value={orderForm.phone}
+                  onChange={(e) => onUpdateForm('phone', e.target.value)}
+                  placeholder="+998 90 123 45 67"
+                  type="tel"
+                  className="h-6 w-full bg-transparent text-sm outline-none"
+                  style={{ color: '#111426' }}
+                />
+              </div>
+            </div>
+
+            {/* Address */}
+            <div>
+              <label className="mb-1.5 block text-sm font-bold" style={{ color: '#334155' }}>
+                Manzil <span style={{ color: '#ef4444' }}>*</span>
+              </label>
+              <div className="flex items-center gap-3 rounded-2xl border px-4 py-3 transition-all focus-within:border-violet-300 focus-within:shadow-md focus-within:shadow-violet-100" style={{ borderColor: '#e2e8f0', background: '#fafafa' }}>
+                <MapPin size={20} style={{ color: '#94a3b8' }} className="shrink-0" />
+                <input
+                  value={orderForm.address}
+                  onChange={(e) => onUpdateForm('address', e.target.value)}
+                  placeholder="Toshkent shahar, Yunusobod tumani..."
+                  className="h-6 w-full bg-transparent text-sm outline-none"
+                  style={{ color: '#111426' }}
+                />
+              </div>
+            </div>
+
+            {/* Map Location */}
+            <div>
+              <label className="mb-1.5 block text-sm font-bold" style={{ color: '#334155' }}>
+                Xaritadan tanlash (ixtiyoriy)
+              </label>
+              <p className="text-xs mb-2" style={{ color: '#64748b' }}>Yetkazib berishni osonlashtirish uchun xaritadan joyni belgilang</p>
+              <LocationPicker 
+                location={orderForm.location || null} 
+                onChange={(loc) => onUpdateForm('location', loc)} 
+              />
+            </div>
+
+            {/* Comment */}
+            <div>
+              <label className="mb-1.5 block text-sm font-bold" style={{ color: '#334155' }}>
+                Izoh (ixtiyoriy)
+              </label>
+              <div className="flex items-start gap-3 rounded-2xl border px-4 py-3 transition-all focus-within:border-violet-300 focus-within:shadow-md focus-within:shadow-violet-100" style={{ borderColor: '#e2e8f0', background: '#fafafa' }}>
+                <MessageSquare size={20} style={{ color: '#94a3b8' }} className="shrink-0 mt-0.5" />
+                <textarea
+                  value={orderForm.comment}
+                  onChange={(e) => onUpdateForm('comment', e.target.value)}
+                  placeholder="Qo'shimcha izoh..."
+                  rows={3}
+                  className="w-full resize-none bg-transparent text-sm outline-none"
+                  style={{ color: '#111426' }}
+                />
+              </div>
+            </div>
           </div>
         </section>
 

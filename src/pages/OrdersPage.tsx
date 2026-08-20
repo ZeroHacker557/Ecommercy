@@ -29,11 +29,11 @@ export function OrdersPage({ orders, cartCount, onSearch, onOpenCart }: Props) {
   const shown = newest ? filtered : [...filtered].reverse()
 
   const getStatusColor = (status: string) => {
-    if (status === 'Bekor qilingan') return '#ef4444'
+    if (status === 'Bekor qilingan' || status === 'Rad etildi') return '#ef4444'
     if (status === 'Yetkazilmoqda') return '#d97706'
     if (status === 'Yetkazildi') return '#16a34a'
     if (status === 'Qabul qilindi') return '#2563eb'
-    return '#7c3aed'
+    return '#7c3aed' // Yangi
   }
 
   return (

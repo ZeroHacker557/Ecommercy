@@ -22,7 +22,7 @@ export type Category = {
   image?: string
 }
 
-export type OrderStatus = 'Yangi' | 'Qabul qilindi' | 'Yetkazilmoqda' | 'Yetkazildi' | 'Bekor qilingan'
+export type OrderStatus = 'Yangi' | 'Qabul qilindi' | 'Yetkazilmoqda' | 'Yetkazildi' | 'Bekor qilingan' | 'Rad etildi'
 
 export type Order = {
   id: string
@@ -31,13 +31,15 @@ export type Order = {
   total: number
   status: OrderStatus
   customer: OrderForm
+  userId?: number
+  username?: string
 }
 
 export type OrderForm = {
   name: string
   phone: string
   address: string
-  location: string
+  location: { lat: number; lng: number } | null
   comment: string
 }
 

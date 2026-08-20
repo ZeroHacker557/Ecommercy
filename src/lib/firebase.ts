@@ -1,5 +1,5 @@
 import { initializeApp } from 'firebase/app'
-import { getFirestore, collection, addDoc, onSnapshot } from 'firebase/firestore'
+import { getFirestore, collection, addDoc, onSnapshot, query, where, orderBy } from 'firebase/firestore'
 import { getStorage } from 'firebase/storage'
 import type { Product, Category, Order } from '../types/domain'
 
@@ -97,4 +97,34 @@ export async function sendOrderToFirestore(order: Order) {
   } catch (error) {
     console.error("Error writing order to Firestore:", error)
   }
+}
+
+// User Management
+export async function saveUserToFirestore(user: { id: number; first_name: string; last_name?: string; username?: string; photo_url?: string }) {
+  try {
+    const usersRef = collection(db, 'users')
+    // We can use the user's ID as the document ID for easier retrieval
+    const { doc, setDoc } = await import('firebase/firestore')
+    await setDoc(doc(usersRef, String(user.id)), {
+      ...user,
+      lastActive: new Date().toISOString()
+    }, { merge: true })
+  } catch (error) {
+    console.error("Error saving user to Firestore:", error)
+  }
+}
+
+// Subscribe to User Orders
+export function subscribeToUserOrders(userId: number, callback: (orders: Order[]) => void) {
+  const ordersRef = collection(db, 'orders')
+  const q = query(ordersRef, where('userId', '==', userId), orderBy('createdAt', 'desc'))
+  
+  return onSnapshot(q, (snapshot: any) => {
+    const orders = snapshot.docs.map((doc: any) => ({
+      ...doc.data()
+    })) as Order[]
+    callback(orders)
+  }, (error: any) => {
+    console.error("Error fetching user orders:", error)
+  })
 }
