@@ -1,0 +1,509 @@
+"""
+Admin panel — Telegram inline keyboard orqali mahsulot va kategoriya boshqaruvi.
+"""
+import os
+import uuid
+from aiogram import Router, F, Bot
+from aiogram.types import (
+    Message, CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup,
+    FSInputFile
+)
+from aiogram.fsm.context import FSMContext
+from aiogram.fsm.state import State, StatesGroup
+
+from config import ADMIN_ID, IMAGES_DIR
+import database as db
+
+router = Router()
+
+
+# ─── FSM States ──────────────────────────────────────────────
+
+class AddCategory(StatesGroup):
+    name = State()
+
+
+class AddProduct(StatesGroup):
+    category = State()
+    name = State()
+    price = State()
+    old_price = State()
+    description = State()
+    sizes = State()
+    color = State()
+    discount = State()
+    image = State()
+    more_images = State()
+
+
+# ─── Helpers ─────────────────────────────────────────────────
+
+def is_admin(user_id: int) -> bool:
+    return user_id == ADMIN_ID
+
+
+def admin_menu_kb():
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="📦 Mahsulotlar", callback_data="admin_products"),
+         InlineKeyboardButton(text="📂 Kategoriyalar", callback_data="admin_categories")],
+        [InlineKeyboardButton(text="➕ Mahsulot qo'shish", callback_data="admin_add_product")],
+        [InlineKeyboardButton(text="➕ Kategoriya qo'shish", callback_data="admin_add_category")],
+        [InlineKeyboardButton(text="📊 Statistika", callback_data="admin_stats")],
+    ])
+
+
+def back_to_menu_kb():
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="◀️ Admin panel", callback_data="admin_menu")]
+    ])
+
+
+# ─── Admin Menu ──────────────────────────────────────────────
+
+@router.message(F.text == "/admin")
+async def cmd_admin(message: Message, state: FSMContext):
+    if not is_admin(message.from_user.id):
+        await message.answer("⛔ Sizda admin huquqi yo'q.")
+        return
+    await state.clear()
+    await message.answer(
+        "🛠 <b>Admin Panel</b>\n\nQuyidagi bo'limlardan birini tanlang:",
+        reply_markup=admin_menu_kb(),
+        parse_mode="HTML"
+    )
+
+
+@router.callback_query(F.data == "admin_menu")
+async def cb_admin_menu(callback: CallbackQuery, state: FSMContext):
+    if not is_admin(callback.from_user.id):
+        return
+    await state.clear()
+    await callback.message.edit_text(
+        "🛠 <b>Admin Panel</b>\n\nQuyidagi bo'limlardan birini tanlang:",
+        reply_markup=admin_menu_kb(),
+        parse_mode="HTML"
+    )
+
+
+# ─── Statistics ──────────────────────────────────────────────
+
+@router.callback_query(F.data == "admin_stats")
+async def cb_stats(callback: CallbackQuery):
+    if not is_admin(callback.from_user.id):
+        return
+    products = db.get_products()
+    categories = db.get_categories()
+    await callback.message.edit_text(
+        f"📊 <b>Statistika</b>\n\n"
+        f"📦 Mahsulotlar soni: <b>{len(products)}</b>\n"
+        f"📂 Kategoriyalar soni: <b>{len(categories)}</b>\n",
+        reply_markup=back_to_menu_kb(),
+        parse_mode="HTML"
+    )
+
+
+# ─── Categories ──────────────────────────────────────────────
+
+@router.callback_query(F.data == "admin_categories")
+async def cb_categories(callback: CallbackQuery):
+    if not is_admin(callback.from_user.id):
+        return
+    cats = db.get_categories()
+    if not cats:
+        await callback.message.edit_text(
+            "📂 <b>Kategoriyalar</b>\n\nHali kategoriya qo'shilmagan.",
+            reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text="➕ Kategoriya qo'shish", callback_data="admin_add_category")],
+                [InlineKeyboardButton(text="◀️ Admin panel", callback_data="admin_menu")]
+            ]),
+            parse_mode="HTML"
+        )
+        return
+
+    buttons = []
+    for c in cats:
+        buttons.append([
+            InlineKeyboardButton(text=f"📂 {c['name']}", callback_data=f"cat_view_{c['id']}"),
+            InlineKeyboardButton(text="🗑", callback_data=f"cat_del_{c['id']}")
+        ])
+    buttons.append([InlineKeyboardButton(text="➕ Kategoriya qo'shish", callback_data="admin_add_category")])
+    buttons.append([InlineKeyboardButton(text="◀️ Admin panel", callback_data="admin_menu")])
+
+    await callback.message.edit_text(
+        f"📂 <b>Kategoriyalar</b> ({len(cats)} ta)\n\nO'chirish uchun 🗑 tugmasini bosing:",
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=buttons),
+        parse_mode="HTML"
+    )
+
+
+@router.callback_query(F.data == "admin_add_category")
+async def cb_add_category(callback: CallbackQuery, state: FSMContext):
+    if not is_admin(callback.from_user.id):
+        return
+    await state.set_state(AddCategory.name)
+    await callback.message.edit_text(
+        "📂 <b>Yangi kategoriya</b>\n\nKategoriya nomini yozing:",
+        parse_mode="HTML"
+    )
+
+
+@router.message(AddCategory.name)
+async def process_category_name(message: Message, state: FSMContext):
+    if not is_admin(message.from_user.id):
+        return
+    cat = db.add_category(message.text.strip())
+    await state.clear()
+    await message.answer(
+        f"✅ Kategoriya qo'shildi: <b>{cat['name']}</b>",
+        reply_markup=back_to_menu_kb(),
+        parse_mode="HTML"
+    )
+
+
+@router.callback_query(F.data.startswith("cat_del_"))
+async def cb_delete_category(callback: CallbackQuery):
+    if not is_admin(callback.from_user.id):
+        return
+    cat_id = int(callback.data.split("_")[-1])
+    cat = db.get_category_by_id(cat_id)
+    name = cat["name"] if cat else "Noma'lum"
+    db.delete_category(cat_id)
+    await callback.answer(f"🗑 {name} o'chirildi")
+    # Refresh list
+    await cb_categories(callback)
+
+
+# ─── Products List ───────────────────────────────────────────
+
+@router.callback_query(F.data == "admin_products")
+async def cb_products(callback: CallbackQuery):
+    if not is_admin(callback.from_user.id):
+        return
+    products = db.get_products()
+    if not products:
+        await callback.message.edit_text(
+            "📦 <b>Mahsulotlar</b>\n\nHali mahsulot qo'shilmagan.",
+            reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text="➕ Mahsulot qo'shish", callback_data="admin_add_product")],
+                [InlineKeyboardButton(text="◀️ Admin panel", callback_data="admin_menu")]
+            ]),
+            parse_mode="HTML"
+        )
+        return
+
+    buttons = []
+    for p in products[-20:]:  # Last 20
+        buttons.append([
+            InlineKeyboardButton(
+                text=f"📦 {p['name'][:30]} — {db.format_price(p['price'])}",
+                callback_data=f"prod_view_{p['id']}"
+            ),
+            InlineKeyboardButton(text="🗑", callback_data=f"prod_del_{p['id']}")
+        ])
+    buttons.append([InlineKeyboardButton(text="➕ Mahsulot qo'shish", callback_data="admin_add_product")])
+    buttons.append([InlineKeyboardButton(text="◀️ Admin panel", callback_data="admin_menu")])
+
+    await callback.message.edit_text(
+        f"📦 <b>Mahsulotlar</b> ({len(products)} ta)\n\nKo'rish yoki o'chirish:",
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=buttons),
+        parse_mode="HTML"
+    )
+
+
+@router.callback_query(F.data.startswith("prod_view_"))
+async def cb_view_product(callback: CallbackQuery, bot: Bot):
+    if not is_admin(callback.from_user.id):
+        return
+    prod_id = int(callback.data.split("_")[-1])
+    p = db.get_product_by_id(prod_id)
+    if not p:
+        await callback.answer("Mahsulot topilmadi")
+        return
+
+    text = (
+        f"📦 <b>{p['name']}</b>\n\n"
+        f"💰 Narx: <b>{db.format_price(p['price'])}</b>\n"
+    )
+    if p.get("oldPrice"):
+        text += f"💰 Eski narx: <s>{db.format_price(p['oldPrice'])}</s>\n"
+    text += f"📂 Kategoriya: {p['category']}\n"
+    if p.get("color"):
+        text += f"🎨 Rang: {p['color']}\n"
+    if p.get("sizes"):
+        text += f"📏 Razmerlar: {', '.join(p['sizes'])}\n"
+    if p.get("discount"):
+        text += f"🏷 Chegirma: {p['discount']}\n"
+    if p.get("description"):
+        text += f"\n📝 {p['description'][:200]}\n"
+    text += f"\n⭐ {p['rating']} ({p['reviews']} baho)"
+
+    kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="🗑 O'chirish", callback_data=f"prod_del_{p['id']}")],
+        [InlineKeyboardButton(text="◀️ Mahsulotlar", callback_data="admin_products")],
+    ])
+
+    # Send image if available
+    if p.get("images") and p["images"]:
+        img_path = os.path.join(IMAGES_DIR, p["images"][0])
+        if os.path.exists(img_path):
+            photo = FSInputFile(img_path)
+            await callback.message.delete()
+            await bot.send_photo(
+                callback.from_user.id, photo=photo,
+                caption=text, reply_markup=kb, parse_mode="HTML"
+            )
+            return
+
+    await callback.message.edit_text(text, reply_markup=kb, parse_mode="HTML")
+
+
+@router.callback_query(F.data.startswith("prod_del_"))
+async def cb_delete_product(callback: CallbackQuery):
+    if not is_admin(callback.from_user.id):
+        return
+    prod_id = int(callback.data.split("_")[-1])
+    p = db.get_product_by_id(prod_id)
+    name = p["name"] if p else "Noma'lum"
+    db.delete_product(prod_id)
+    await callback.answer(f"🗑 {name} o'chirildi")
+    await cb_products(callback)
+
+
+# ─── Add Product Flow ────────────────────────────────────────
+
+@router.callback_query(F.data == "admin_add_product")
+async def cb_add_product_start(callback: CallbackQuery, state: FSMContext):
+    if not is_admin(callback.from_user.id):
+        return
+
+    cats = db.get_categories()
+    if not cats:
+        await callback.message.edit_text(
+            "⚠️ Avval kamida bitta kategoriya qo'shing!",
+            reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text="➕ Kategoriya qo'shish", callback_data="admin_add_category")],
+                [InlineKeyboardButton(text="◀️ Admin panel", callback_data="admin_menu")]
+            ]),
+            parse_mode="HTML"
+        )
+        return
+
+    buttons = [[InlineKeyboardButton(text=c["name"], callback_data=f"addprod_cat_{c['id']}")] for c in cats]
+    buttons.append([InlineKeyboardButton(text="❌ Bekor qilish", callback_data="admin_menu")])
+
+    await callback.message.edit_text(
+        "📦 <b>Yangi mahsulot</b>\n\n1️⃣ Kategoriyani tanlang:",
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=buttons),
+        parse_mode="HTML"
+    )
+
+
+@router.callback_query(F.data.startswith("addprod_cat_"))
+async def cb_add_product_category(callback: CallbackQuery, state: FSMContext):
+    if not is_admin(callback.from_user.id):
+        return
+    cat_id = int(callback.data.split("_")[-1])
+    cat = db.get_category_by_id(cat_id)
+    if not cat:
+        await callback.answer("Kategoriya topilmadi")
+        return
+
+    await state.update_data(category=cat["name"], images=[])
+    await state.set_state(AddProduct.name)
+    await callback.message.edit_text(
+        f"📦 <b>Yangi mahsulot</b>\n\n"
+        f"📂 Kategoriya: <b>{cat['name']}</b>\n\n"
+        f"2️⃣ Mahsulot nomini yozing:",
+        parse_mode="HTML"
+    )
+
+
+@router.message(AddProduct.name)
+async def process_product_name(message: Message, state: FSMContext):
+    if not is_admin(message.from_user.id):
+        return
+    await state.update_data(name=message.text.strip())
+    await state.set_state(AddProduct.price)
+    await message.answer(
+        f"✅ Nom: <b>{message.text.strip()}</b>\n\n"
+        f"3️⃣ Narxni kiriting (faqat raqam, so'mda):\n"
+        f"Masalan: <code>150000</code>",
+        parse_mode="HTML"
+    )
+
+
+@router.message(AddProduct.price)
+async def process_product_price(message: Message, state: FSMContext):
+    if not is_admin(message.from_user.id):
+        return
+    try:
+        price = int(message.text.strip().replace(" ", "").replace(",", ""))
+    except ValueError:
+        await message.answer("❌ Faqat raqam kiriting! Masalan: 150000")
+        return
+    await state.update_data(price=price)
+    await state.set_state(AddProduct.old_price)
+    await message.answer(
+        f"✅ Narx: <b>{db.format_price(price)}</b>\n\n"
+        f"4️⃣ Eski narx (chegirma uchun). Yo'q bo'lsa <b>-</b> yozing:",
+        parse_mode="HTML"
+    )
+
+
+@router.message(AddProduct.old_price)
+async def process_old_price(message: Message, state: FSMContext):
+    if not is_admin(message.from_user.id):
+        return
+    text = message.text.strip()
+    old_price = None
+    if text != "-":
+        try:
+            old_price = int(text.replace(" ", "").replace(",", ""))
+        except ValueError:
+            await message.answer("❌ Faqat raqam yoki - kiriting!")
+            return
+    await state.update_data(oldPrice=old_price)
+    await state.set_state(AddProduct.description)
+    await message.answer(
+        "5️⃣ Mahsulot tavsifini yozing.\nYo'q bo'lsa <b>-</b> yozing:",
+        parse_mode="HTML"
+    )
+
+
+@router.message(AddProduct.description)
+async def process_description(message: Message, state: FSMContext):
+    if not is_admin(message.from_user.id):
+        return
+    text = message.text.strip()
+    desc = text if text != "-" else ""
+    await state.update_data(description=desc)
+    await state.set_state(AddProduct.sizes)
+    await message.answer(
+        "6️⃣ Razmerlarni vergul bilan yozing.\n"
+        "Masalan: <code>S, M, L, XL</code>\n"
+        "Yo'q bo'lsa <b>-</b> yozing:",
+        parse_mode="HTML"
+    )
+
+
+@router.message(AddProduct.sizes)
+async def process_sizes(message: Message, state: FSMContext):
+    if not is_admin(message.from_user.id):
+        return
+    text = message.text.strip()
+    sizes = [s.strip() for s in text.split(",")] if text != "-" else []
+    await state.update_data(sizes=sizes)
+    await state.set_state(AddProduct.color)
+    await message.answer(
+        "7️⃣ Rangni yozing.\nMasalan: <code>Qora</code>\n"
+        "Yo'q bo'lsa <b>-</b> yozing:",
+        parse_mode="HTML"
+    )
+
+
+@router.message(AddProduct.color)
+async def process_color(message: Message, state: FSMContext):
+    if not is_admin(message.from_user.id):
+        return
+    text = message.text.strip()
+    color = text if text != "-" else ""
+    await state.update_data(color=color)
+    await state.set_state(AddProduct.discount)
+    await message.answer(
+        "8️⃣ Chegirma foizini yozing.\n"
+        "Masalan: <code>-20%</code>\n"
+        "Yo'q bo'lsa <b>-</b> yozing:",
+        parse_mode="HTML"
+    )
+
+
+@router.message(AddProduct.discount)
+async def process_discount(message: Message, state: FSMContext):
+    if not is_admin(message.from_user.id):
+        return
+    text = message.text.strip()
+    discount = text if text != "-" else ""
+    await state.update_data(discount=discount)
+    await state.set_state(AddProduct.image)
+    await message.answer(
+        "9️⃣ Mahsulot rasmini yuboring (foto sifatida).\n"
+        "Bu asosiy rasm bo'ladi:",
+        parse_mode="HTML"
+    )
+
+
+@router.message(AddProduct.image, F.photo)
+async def process_image(message: Message, state: FSMContext, bot: Bot):
+    if not is_admin(message.from_user.id):
+        return
+
+    # Download image
+    photo = message.photo[-1]  # Highest resolution
+    file = await bot.get_file(photo.file_id)
+    ext = "jpg"
+    filename = f"{uuid.uuid4().hex}.{ext}"
+    filepath = os.path.join(IMAGES_DIR, filename)
+    await bot.download_file(file.file_path, filepath)
+
+    data = await state.get_data()
+    images = data.get("images", [])
+    images.append(filename)
+    await state.update_data(images=images)
+
+    await state.set_state(AddProduct.more_images)
+    await message.answer(
+        f"✅ Rasm saqlandi! ({len(images)} ta rasm)\n\n"
+        f"Yana rasm qo'shmoqchimisiz?",
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="📷 Yana rasm qo'shish", callback_data="addprod_more_img")],
+            [InlineKeyboardButton(text="✅ Tayyor — saqlash", callback_data="addprod_save")],
+        ]),
+        parse_mode="HTML"
+    )
+
+
+@router.message(AddProduct.image)
+async def process_image_invalid(message: Message, state: FSMContext):
+    if not is_admin(message.from_user.id):
+        return
+    await message.answer("❌ Iltimos, rasm yuboring (foto sifatida)!")
+
+
+@router.callback_query(F.data == "addprod_more_img")
+async def cb_more_images(callback: CallbackQuery, state: FSMContext):
+    if not is_admin(callback.from_user.id):
+        return
+    await state.set_state(AddProduct.image)
+    await callback.message.edit_text("📷 Keyingi rasmni yuboring:")
+
+
+@router.message(AddProduct.more_images, F.photo)
+async def process_more_image(message: Message, state: FSMContext, bot: Bot):
+    # Same as process_image
+    await process_image(message, state, bot)
+
+
+@router.callback_query(F.data == "addprod_save")
+async def cb_save_product(callback: CallbackQuery, state: FSMContext):
+    if not is_admin(callback.from_user.id):
+        return
+    data = await state.get_data()
+    product = db.add_product(data)
+    await state.clear()
+
+    text = (
+        f"✅ <b>Mahsulot qo'shildi!</b>\n\n"
+        f"📦 {product['name']}\n"
+        f"💰 {db.format_price(product['price'])}\n"
+        f"📂 {product['category']}\n"
+        f"🖼 {len(product.get('images', []))} ta rasm\n"
+    )
+
+    await callback.message.edit_text(
+        text,
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="➕ Yana mahsulot qo'shish", callback_data="admin_add_product")],
+            [InlineKeyboardButton(text="◀️ Admin panel", callback_data="admin_menu")],
+        ]),
+        parse_mode="HTML"
+    )

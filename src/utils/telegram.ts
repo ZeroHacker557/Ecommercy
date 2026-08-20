@@ -1,0 +1,159 @@
+// Telegram WebApp SDK utilities
+// https://core.telegram.org/bots/webapps
+
+declare global {
+  interface Window {
+    Telegram?: {
+      WebApp: TelegramWebApp
+    }
+  }
+}
+
+interface TelegramWebApp {
+  initData: string
+  initDataUnsafe: {
+    user?: {
+      id: number
+      first_name: string
+      last_name?: string
+      username?: string
+      language_code?: string
+      photo_url?: string
+    }
+    query_id?: string
+  }
+  version: string
+  platform: string
+  colorScheme: 'light' | 'dark'
+  themeParams: Record<string, string>
+  isExpanded: boolean
+  viewportHeight: number
+  viewportStableHeight: number
+  MainButton: {
+    text: string
+    color: string
+    textColor: string
+    isVisible: boolean
+    isActive: boolean
+    setText: (text: string) => void
+    show: () => void
+    hide: () => void
+    onClick: (callback: () => void) => void
+    offClick: (callback: () => void) => void
+    enable: () => void
+    disable: () => void
+    showProgress: (leaveActive?: boolean) => void
+    hideProgress: () => void
+  }
+  BackButton: {
+    isVisible: boolean
+    show: () => void
+    hide: () => void
+    onClick: (callback: () => void) => void
+    offClick: (callback: () => void) => void
+  }
+  HapticFeedback: {
+    impactOccurred: (style: 'light' | 'medium' | 'heavy' | 'rigid' | 'soft') => void
+    notificationOccurred: (type: 'error' | 'success' | 'warning') => void
+    selectionChanged: () => void
+  }
+  ready: () => void
+  expand: () => void
+  close: () => void
+  sendData: (data: string) => void
+  openLink: (url: string, options?: { try_instant_view?: boolean }) => void
+  showPopup: (params: { title?: string; message: string; buttons?: Array<{ id?: string; type?: string; text?: string }> }, callback?: (buttonId: string) => void) => void
+  showAlert: (message: string, callback?: () => void) => void
+  showConfirm: (message: string, callback?: (confirmed: boolean) => void) => void
+}
+
+// Check if running inside Telegram
+export function isTelegram(): boolean {
+  return !!window.Telegram?.WebApp?.initData
+}
+
+// Get Telegram WebApp instance
+export function getTelegram(): TelegramWebApp | null {
+  return window.Telegram?.WebApp ?? null
+}
+
+// Get current user info
+export function getTelegramUser() {
+  const tg = getTelegram()
+  if (!tg) return null
+  return tg.initDataUnsafe.user ?? null
+}
+
+// Initialize Telegram WebApp
+export function initTelegram() {
+  const tg = getTelegram()
+  if (tg) {
+    tg.ready()
+    tg.expand()
+  }
+}
+
+// Send order data to bot
+export function sendOrderData(data: string) {
+  const tg = getTelegram()
+  if (tg) {
+    tg.sendData(data)
+  }
+}
+
+// Haptic feedback
+export function hapticFeedback(type: 'light' | 'medium' | 'heavy' = 'light') {
+  const tg = getTelegram()
+  if (tg) {
+    tg.HapticFeedback.impactOccurred(type)
+  }
+}
+
+export function hapticSuccess() {
+  const tg = getTelegram()
+  if (tg) {
+    tg.HapticFeedback.notificationOccurred('success')
+  }
+}
+
+// API base URL — will be the bot's API
+const API_BASE = 'http://localhost:8080'
+
+export async function fetchProducts() {
+  try {
+    const res = await fetch(`${API_BASE}/api/products`)
+    if (!res.ok) return []
+    return await res.json()
+  } catch {
+    return []
+  }
+}
+
+export async function fetchCategories() {
+  try {
+    const res = await fetch(`${API_BASE}/api/categories`)
+    if (!res.ok) return []
+    return await res.json()
+  } catch {
+    return []
+  }
+}
+
+export async function submitOrder(orderData: unknown) {
+  try {
+    const res = await fetch(`${API_BASE}/api/orders`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(orderData),
+    })
+    return res.ok
+  } catch {
+    return false
+  }
+}
+
+// Product image URL builder
+export function getImageUrl(path: string): string {
+  if (path.startsWith('http')) return path
+  return `${API_BASE}/images/${path}`
+}
