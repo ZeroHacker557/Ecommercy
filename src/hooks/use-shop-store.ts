@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { formatPrice } from '../data'
 import { subscribeToCategories, subscribeToProducts, sendOrderToFirestore } from '../lib/firebase'
 import type { AppPage, Category, Order, OrderForm, Product } from '../types/domain'
-import { fetchCategories, fetchProducts, hapticFeedback, hapticSuccess, initTelegram, submitOrder as apiSubmitOrder } from '../utils/telegram'
+import { hapticFeedback, hapticSuccess, initTelegram, submitOrder as apiSubmitOrder } from '../utils/telegram'
 
 const ORDERS_KEY = 'shopOnlineOrders'
 const LIKES_KEY = 'shopOnlineLikes'
@@ -57,11 +57,7 @@ export function useShopStore() {
         setLoading(false)
       },
       () => {
-        // If Firestore fails, fallback to local API or finish loading
-        fetchProducts().then((apiProds) => {
-          if (apiProds.length > 0) setProducts(apiProds)
-          setLoading(false)
-        }).catch(() => setLoading(false))
+        setLoading(false)
       }
     )
 
@@ -70,11 +66,7 @@ export function useShopStore() {
       (fbCats) => {
         setCategories(fbCats)
       },
-      () => {
-        fetchCategories().then((apiCats) => {
-          if (apiCats.length > 0) setCategories(apiCats)
-        }).catch(() => {})
-      }
+      () => {}
     )
 
     return () => {

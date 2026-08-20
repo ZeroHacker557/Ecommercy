@@ -19,13 +19,16 @@ export const db = getFirestore(app)
 export const storage = getStorage(app)
 
 // Real-time Firestore Listeners
-export function subscribeToProducts(callback: (products: Product[]) => void, onError?: () => void) {
+export function subscribeToProducts(callback: (products: Product[]) => void, onError?: (err: unknown) => void) {
   const productsRef = collection(db, 'products')
   return onSnapshot(productsRef, (snapshot) => {
     const products: Product[] = snapshot.docs.map((doc) => {
       const data = doc.data()
+      const rawId = data.id || doc.id
+      const numId = typeof rawId === 'number' ? rawId : (parseInt(String(rawId), 10) || Math.abs(hashString(doc.id)))
+      
       return {
-        id: data.id || doc.id,
+        id: numId,
         name: data.name || '',
         price: Number(data.price) || 0,
         oldPrice: data.oldPrice ? Number(data.oldPrice) : undefined,
@@ -42,26 +45,38 @@ export function subscribeToProducts(callback: (products: Product[]) => void, onE
     callback(products)
   }, (error) => {
     console.error("Firestore products snapshot error:", error)
-    if (onError) onError()
+    if (onError) onError(error)
   })
 }
 
-export function subscribeToCategories(callback: (categories: Category[]) => void, onError?: () => void) {
+export function subscribeToCategories(callback: (categories: Category[]) => void, onError?: (err: unknown) => void) {
   const categoriesRef = collection(db, 'categories')
   return onSnapshot(categoriesRef, (snapshot) => {
     const categories: Category[] = snapshot.docs.map((doc) => {
       const data = doc.data()
+      const rawId = data.id || doc.id
+      const numId = typeof rawId === 'number' ? rawId : (parseInt(String(rawId), 10) || Math.abs(hashString(doc.id)))
+      
       return {
-        id: data.id || doc.id,
+        id: numId,
         name: data.name || '',
-        icon: data.icon || ''
+        icon: data.icon || 'package'
       }
     })
     callback(categories)
   }, (error) => {
     console.error("Firestore categories snapshot error:", error)
-    if (onError) onError()
+    if (onError) onError(error)
   })
+}
+
+function hashString(str: string): number {
+  let hash = 0
+  for (let i = 0; i < str.length; i++) {
+    hash = (hash << 5) - hash + str.charCodeAt(i)
+    hash |= 0
+  }
+  return hash
 }
 
 // Send Order to Firestore
