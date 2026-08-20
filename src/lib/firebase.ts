@@ -20,8 +20,10 @@ export const storage = getStorage(app)
 
 // Real-time Firestore Listeners
 export function subscribeToProducts(callback: (products: Product[]) => void, onError?: (err: unknown) => void) {
+  console.log('[Firebase] Subscribing to products collection...')
   const productsRef = collection(db, 'products')
   return onSnapshot(productsRef, (snapshot) => {
+    console.log(`[Firebase] Products snapshot received: ${snapshot.size} documents`)
     const products: Product[] = snapshot.docs.map((doc) => {
       const data = doc.data()
       const rawId = data.id || doc.id
@@ -44,14 +46,18 @@ export function subscribeToProducts(callback: (products: Product[]) => void, onE
     })
     callback(products)
   }, (error) => {
-    console.error("Firestore products snapshot error:", error)
+    console.error('[Firebase] Products snapshot ERROR:', error)
+    console.error('[Firebase] This usually means Firestore Security Rules are blocking read access.')
+    console.error('[Firebase] Go to Firebase Console → Firestore → Rules and set: allow read: if true;')
     if (onError) onError(error)
   })
 }
 
 export function subscribeToCategories(callback: (categories: Category[]) => void, onError?: (err: unknown) => void) {
+  console.log('[Firebase] Subscribing to categories collection...')
   const categoriesRef = collection(db, 'categories')
   return onSnapshot(categoriesRef, (snapshot) => {
+    console.log(`[Firebase] Categories snapshot received: ${snapshot.size} documents`)
     const categories: Category[] = snapshot.docs.map((doc) => {
       const data = doc.data()
       const rawId = data.id || doc.id
@@ -65,7 +71,8 @@ export function subscribeToCategories(callback: (categories: Category[]) => void
     })
     callback(categories)
   }, (error) => {
-    console.error("Firestore categories snapshot error:", error)
+    console.error('[Firebase] Categories snapshot ERROR:', error)
+    console.error('[Firebase] This usually means Firestore Security Rules are blocking read access.')
     if (onError) onError(error)
   })
 }
