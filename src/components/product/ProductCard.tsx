@@ -2,50 +2,60 @@ import { Heart, ShoppingCart, Star } from 'lucide-react'
 import { formatPrice } from '../../data'
 import { getImageUrl } from '../../utils/telegram'
 import type { Product, ProductActions } from '../../types/domain'
+import { useState } from 'react'
 
 type Props = ProductActions & { product: Product; compact?: boolean }
 
 export function ProductCard({ product, onOpen, onAddToCart, likedIds, onToggleLike, compact = false }: Props) {
   const favourite = likedIds.includes(product.id)
   const imgSrc = product.images?.[0] ? getImageUrl(product.images[0]) : ''
+  const [imgError, setImgError] = useState(false)
+
+  const imageHeight = compact ? 'h-36' : 'h-48 sm:h-56'
 
   return (
-    <article className={'product-card group ' + (compact ? 'min-w-[174px] sm:min-w-[210px]' : '')}>
+    <article className={'product-card group ' + (compact ? 'compact' : '')}>
       {/* Like Button */}
       <button
-        className="absolute right-3 top-3 z-10 grid size-9 place-items-center rounded-full shadow-sm transition hover:scale-110 active:scale-90"
-        style={{ background: 'rgba(255,255,255,0.92)', color: favourite ? '#6c20f5' : '#111426' }}
+        className="product-card-like"
+        style={{ color: favourite ? '#6c20f5' : '#111426' }}
         onClick={(e) => { e.stopPropagation(); onToggleLike(product.id) }}
         aria-label="Sevimliga qo'shish"
       >
-        <Heart size={21} fill={favourite ? '#6c20f5' : 'none'} />
+        <Heart size={18} fill={favourite ? '#6c20f5' : 'none'} />
       </button>
 
       {/* Discount Badge */}
       {product.discount && (
-        <span className="absolute left-3 top-3 z-10 rounded-lg px-2 py-1 text-xs font-bold shadow-md" style={{ background: '#f43f5e', color: '#fff' }}>
+        <span className="product-card-badge">
           {product.discount}
         </span>
       )}
 
-      {/* Image */}
-      <button className="block w-full text-left" onClick={() => onOpen(product)} style={{ color: '#111426' }}>
-        {imgSrc ? (
-          <img
-            className={'w-full object-contain transition duration-500 group-hover:scale-105 ' + (compact ? 'h-36 p-3' : 'h-48 p-5 sm:h-56')}
-            src={imgSrc}
-            alt={product.name}
-          />
-        ) : (
-          <div className={'grid w-full place-items-center ' + (compact ? 'h-36' : 'h-48 sm:h-56')} style={{ color: '#cbd5e1' }}>
-            <ShoppingCart size={40} />
-          </div>
-        )}
-        <div className="px-4 pb-3">
-          <h3 className="line-clamp-2 text-sm font-bold sm:text-base" style={{ color: '#111426' }}>{product.name}</h3>
+      {/* Clickable Area: Image + Info */}
+      <button className="product-card-body" onClick={() => onOpen(product)}>
+        {/* Image Container - always takes fixed space */}
+        <div className={`product-card-image ${imageHeight}`}>
+          {imgSrc && !imgError ? (
+            <img
+              className="product-card-img"
+              src={imgSrc}
+              alt={product.name}
+              onError={() => setImgError(true)}
+            />
+          ) : (
+            <div className="product-card-placeholder">
+              <ShoppingCart size={36} />
+            </div>
+          )}
+        </div>
+
+        {/* Product Info */}
+        <div className="product-card-info">
+          <h3 className="product-card-name">{product.name}</h3>
           {!compact && (
-            <p className="mt-2 flex items-center gap-1 text-xs" style={{ color: '#64748b' }}>
-              <Star size={15} fill="#ffb000" style={{ color: '#fbbf24' }} />
+            <p className="product-card-rating">
+              <Star size={14} fill="#ffb000" style={{ color: '#fbbf24' }} />
               {product.rating.toFixed(1)} ({product.reviews})
             </p>
           )}
@@ -53,11 +63,11 @@ export function ProductCard({ product, onOpen, onAddToCart, likedIds, onToggleLi
       </button>
 
       {/* Price & Add to Cart */}
-      <div className="flex items-end justify-between gap-2 px-4 pb-4">
-        <div>
-          <p className="whitespace-nowrap text-sm font-extrabold sm:text-base" style={{ color: '#111426' }}>{formatPrice(product.price)}</p>
+      <div className="product-card-footer">
+        <div className="product-card-price-block">
+          <p className="product-card-price">{formatPrice(product.price)}</p>
           {product.oldPrice && !compact && (
-            <p className="mt-1 text-[11px] line-through" style={{ color: '#94a3b8' }}>{formatPrice(product.oldPrice)}</p>
+            <p className="product-card-old-price">{formatPrice(product.oldPrice)}</p>
           )}
         </div>
         <button
@@ -65,7 +75,7 @@ export function ProductCard({ product, onOpen, onAddToCart, likedIds, onToggleLi
           onClick={(e) => { e.stopPropagation(); onAddToCart(product) }}
           aria-label="Savatchaga qo'shish"
         >
-          <ShoppingCart size={20} />
+          <ShoppingCart size={18} />
         </button>
       </div>
     </article>
