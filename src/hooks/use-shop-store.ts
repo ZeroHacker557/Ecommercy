@@ -48,33 +48,34 @@ export function useShopStore() {
   // Initialize Telegram & Firebase real-time subscriptions
   useEffect(() => {
     initTelegram()
-
     setLoading(true)
 
     // 1. Subscribe to Firestore products
-    const unsubProds = subscribeToProducts((fbProducts) => {
-      if (fbProducts.length > 0) {
+    const unsubProds = subscribeToProducts(
+      (fbProducts) => {
         setProducts(fbProducts)
         setLoading(false)
-      } else {
-        // Fallback to local HTTP API if Firestore is empty
+      },
+      () => {
+        // If Firestore fails, fallback to local API or finish loading
         fetchProducts().then((apiProds) => {
           if (apiProds.length > 0) setProducts(apiProds)
           setLoading(false)
         }).catch(() => setLoading(false))
       }
-    })
+    )
 
     // 2. Subscribe to Firestore categories
-    const unsubCats = subscribeToCategories((fbCats) => {
-      if (fbCats.length > 0) {
+    const unsubCats = subscribeToCategories(
+      (fbCats) => {
         setCategories(fbCats)
-      } else {
+      },
+      () => {
         fetchCategories().then((apiCats) => {
           if (apiCats.length > 0) setCategories(apiCats)
         }).catch(() => {})
       }
-    })
+    )
 
     return () => {
       unsubProds()

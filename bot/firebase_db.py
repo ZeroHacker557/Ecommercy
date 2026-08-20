@@ -3,6 +3,7 @@ Firebase Firestore & Storage Integration for Python Telegram Bot
 """
 import os
 import uuid
+import urllib.parse
 import firebase_admin
 from firebase_admin import credentials, firestore, storage
 
@@ -39,12 +40,15 @@ def upload_image_to_firebase(local_path: str) -> str:
         blob_name = f"products/{uuid.uuid4().hex}_{os.path.basename(local_path)}"
         blob = bucket.blob(blob_name)
         blob.upload_from_filename(local_path)
-        blob.make_public()
-        return blob.public_url
+        
+        # Standard public Firebase download URL format
+        encoded_name = urllib.parse.quote(blob_name, safe='')
+        url = f"https://firebasestorage.googleapis.com/v0/b/{bucket.name}/o/{encoded_name}?alt=media"
+        print(f"[OK] Uploaded image to Firebase: {url}")
+        return url
     except Exception as e:
         print(f"[ERR] Firebase Storage error: {e}")
-        # Fallback URL if public URL generation fails
-        return f"https://storage.googleapis.com/{bucket.name}/{blob_name}"
+        return ""
 
 
 # ─── Products ─────────────────────────────────────────────────
@@ -78,9 +82,14 @@ def add_product(data: dict):
         else:
             # Check local images folder
             local_path = os.path.join("images", img)
+            if not os.path.exists(local_path):
+                local_path = img
             if os.path.exists(local_path):
                 public_url = upload_image_to_firebase(local_path)
-                firebase_images.append(public_url)
+                if public_url:
+                    firebase_images.append(public_url)
+                else:
+                    firebase_images.append(img)
             else:
                 firebase_images.append(img)
 

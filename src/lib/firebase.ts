@@ -1,5 +1,5 @@
 import { initializeApp } from 'firebase/app'
-import { getFirestore, collection, getDocs, doc, setDoc, addDoc, onSnapshot, query, orderBy } from 'firebase/firestore'
+import { getFirestore, collection, addDoc, onSnapshot } from 'firebase/firestore'
 import { getStorage } from 'firebase/storage'
 import type { Product, Category, Order } from '../types/domain'
 
@@ -19,7 +19,7 @@ export const db = getFirestore(app)
 export const storage = getStorage(app)
 
 // Real-time Firestore Listeners
-export function subscribeToProducts(callback: (products: Product[]) => void) {
+export function subscribeToProducts(callback: (products: Product[]) => void, onError?: () => void) {
   const productsRef = collection(db, 'products')
   return onSnapshot(productsRef, (snapshot) => {
     const products: Product[] = snapshot.docs.map((doc) => {
@@ -42,10 +42,11 @@ export function subscribeToProducts(callback: (products: Product[]) => void) {
     callback(products)
   }, (error) => {
     console.error("Firestore products snapshot error:", error)
+    if (onError) onError()
   })
 }
 
-export function subscribeToCategories(callback: (categories: Category[]) => void) {
+export function subscribeToCategories(callback: (categories: Category[]) => void, onError?: () => void) {
   const categoriesRef = collection(db, 'categories')
   return onSnapshot(categoriesRef, (snapshot) => {
     const categories: Category[] = snapshot.docs.map((doc) => {
@@ -59,6 +60,7 @@ export function subscribeToCategories(callback: (categories: Category[]) => void
     callback(categories)
   }, (error) => {
     console.error("Firestore categories snapshot error:", error)
+    if (onError) onError()
   })
 }
 
