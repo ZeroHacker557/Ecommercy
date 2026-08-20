@@ -42,7 +42,7 @@ def upload_image_to_firebase(local_path: str) -> str:
         blob.make_public()
         return blob.public_url
     except Exception as e:
-        print(f"❌ Firebase Storage error: {e}")
+        print(f"[ERR] Firebase Storage error: {e}")
         # Fallback URL if public URL generation fails
         return f"https://storage.googleapis.com/{bucket.name}/{blob_name}"
 
@@ -101,13 +101,13 @@ def add_product(data: dict):
     }
 
     db.collection("products").document(product_id).set(product_data)
-    print(f"✅ Firebase: Mahsulot saqlandi ({product_data['name']})")
+    print(f"[OK] Firebase: Mahsulot saqlandi ({product_data['name']})")
     return product_data
 
 
 def delete_product(prod_id: str | int):
     db.collection("products").document(str(prod_id)).delete()
-    print(f"🗑 Firebase: Mahsulot o'chirildi ({prod_id})")
+    print(f"[DEL] Firebase: Mahsulot o'chirildi ({prod_id})")
 
 
 # ─── Categories ───────────────────────────────────────────────
@@ -136,10 +136,10 @@ def add_category(name: str):
     cat_id = str(int(uuid.uuid4().int % 100000))
     cat_data = {"id": cat_id, "name": name, "icon": "package"}
     db.collection("categories").document(cat_id).set(cat_data)
-    print(f"✅ Firebase: Kategoriya qo'shildi ({name})")
+    print(f"[OK] Firebase: Kategoriya qo'shildi ({name})")
     return cat_data
 
 
 def delete_category(cat_id: str | int):
     db.collection("categories").document(str(cat_id)).delete()
-    print(f"🗑 Firebase: Kategoriya o'chirildi ({cat_id})")
+    print(f"[DEL] Firebase: Kategoriya o'chirildi ({cat_id})")
