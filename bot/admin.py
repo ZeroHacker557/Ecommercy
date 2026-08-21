@@ -22,6 +22,13 @@ router = Router()
 class AddCategory(StatesGroup):
     name = State()
 
+class BroadcastMenu(StatesGroup):
+    message = State()
+
+class AddPromo(StatesGroup):
+    code = State()
+    discount = State()
+
 
 class AddProduct(StatesGroup):
     category = State()
@@ -48,6 +55,8 @@ def admin_menu_kb():
          InlineKeyboardButton(text="📂 Kategoriyalar", callback_data="admin_categories")],
         [InlineKeyboardButton(text="➕ Mahsulot qo'shish", callback_data="admin_add_product")],
         [InlineKeyboardButton(text="➕ Kategoriya qo'shish", callback_data="admin_add_category")],
+        [InlineKeyboardButton(text="🎟 Promokodlar", callback_data="admin_promocodes"),
+         InlineKeyboardButton(text="📢 Xabarnoma", callback_data="admin_broadcast")],
         [InlineKeyboardButton(text="📊 Statistika", callback_data="admin_stats")],
     ])
 
@@ -99,10 +108,22 @@ async def cb_stats(callback: CallbackQuery):
         return
     products = db.get_products()
     categories = db.get_categories()
+    users = db.get_all_users()
+    
+    docs = db.db.collection("orders").get()
+    orders = [doc.to_dict() for doc in docs]
+    
+    total_revenue = sum(o.get('total', 0) for o in orders if o.get('status') == 'Yetkazildi')
+    active_orders = sum(1 for o in orders if o.get('status') in ['Yangi', 'Qabul qilindi', 'Yetkazilmoqda'])
+    
     await callback.message.edit_text(
-        f"📊 <b>Statistika</b>\n\n"
-        f"📦 Mahsulotlar soni: <b>{len(products)}</b>\n"
-        f"📂 Kategoriyalar soni: <b>{len(categories)}</b>\n",
+        f"📊 <b>Batafsil Statistika</b>\n\n"
+        f"👥 Foydalanuvchilar: <b>{len(users)}</b>\n"
+        f"📦 Mahsulotlar: <b>{len(products)}</b>\n"
+        f"📂 Kategoriyalar: <b>{len(categories)}</b>\n"
+        f"🛒 Barcha buyurtmalar: <b>{len(orders)}</b>\n"
+        f"🔄 Faol buyurtmalar: <b>{active_orders}</b>\n"
+        f"💰 Umumiy daromad: <b>{db.format_price(total_revenue)}</b>\n",
         reply_markup=back_to_menu_kb(),
         parse_mode="HTML"
     )
@@ -581,3 +602,95 @@ async def cb_save_product(callback: CallbackQuery, state: FSMContext):
         ]),
         parse_mode="HTML"
     )
+
+
+# ─── Broadcast (Ommaviy xabar) ───────────────────────────────
+
+@router.callback_query(F.data == "admin_broadcast")
+async def cb_broadcast(callback: CallbackQuery, state: FSMContext):
+    if not is_admin(callback.from_user.id):
+        return
+    await state.set_state(BroadcastMenu.message)
+    await callback.message.edit_text(
+        "📢 <b>Ommaviy xabarnoma</b>\n\nFoydalanuvchilarga yubormoqchi bo'lgan xabarni kiriting (yoki /cancel yozing):",
+        reply_markup=back_to_menu_kb(),
+        parse_mode="HTML"
+    )
+
+@router.message(BroadcastMenu.message)
+async def process_broadcast_message(message: Message, state: FSMContext, bot: Bot):
+    if not is_admin(message.from_user.id):
+        return
+    if message.text == "/cancel":
+        await state.clear()
+        await message.answer("❌ Bekor qilindi.", reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="◀️ Admin panel", callback_data="admin_menu")]]))
+        return
+
+    users = db.get_all_users()
+    count = 0
+    for u in users:
+        try:
+            user_id = u.get("id")
+            if user_id:
+                db.send_notification(int(user_id), "Yangi xabar", message.text or "Sizga yangi xabar keldi", "system")
+                count += 1
+        except Exception as e:
+            print(e)
+            pass
+    
+    await state.clear()
+    await message.answer(f"✅ Xabar <b>{count}</b> ta foydalanuvchiga muvaffaqiyatli yuborildi!", reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="◀️ Admin panel", callback_data="admin_menu")]]), parse_mode="HTML")
+
+
+# ─── Promocodes (Promokodlar) ────────────────────────────────
+
+@router.callback_query(F.data == "admin_promocodes")
+async def cb_promocodes(callback: CallbackQuery):
+    if not is_admin(callback.from_user.id):
+        return
+    codes = db.get_promocodes()
+    text = "🎟 <b>Promokodlar</b>\n\n"
+    if not codes:
+        text += "Hozircha promokodlar yo'q."
+    else:
+        for c in codes:
+            text += f"▪️ <b>{c.get('code', '')}</b> - {c.get('discountPercent', 0)}% chegirma (Faol: {'✅' if c.get('active', True) else '❌'})\n"
+    
+    buttons = [
+        [InlineKeyboardButton(text="➕ Promokod qo'shish", callback_data="admin_add_promo")],
+        [InlineKeyboardButton(text="◀️ Admin panel", callback_data="admin_menu")]
+    ]
+    await callback.message.edit_text(text, reply_markup=InlineKeyboardMarkup(inline_keyboard=buttons), parse_mode="HTML")
+
+
+@router.callback_query(F.data == "admin_add_promo")
+async def cb_add_promo(callback: CallbackQuery, state: FSMContext):
+    if not is_admin(callback.from_user.id):
+        return
+    await state.set_state(AddPromo.code)
+    await callback.message.edit_text("🎟 Yangi promokodni kiriting (masalan: NEWYEAR2026):", reply_markup=back_to_menu_kb())
+
+
+@router.message(AddPromo.code)
+async def process_promo_code(message: Message, state: FSMContext):
+    if not is_admin(message.from_user.id):
+        return
+    await state.update_data(code=message.text.upper())
+    await state.set_state(AddPromo.discount)
+    await message.answer("Endi chegirma foizini kiriting (raqamda, masalan: 10):")
+
+
+@router.message(AddPromo.discount)
+async def process_promo_discount(message: Message, state: FSMContext):
+    if not is_admin(message.from_user.id):
+        return
+    try:
+        discount = int(message.text)
+    except ValueError:
+        await message.answer("Iltimos, faqat raqam kiriting!")
+        return
+
+    data = await state.get_data()
+    db.add_promocode(data['code'], discount)
+    await state.clear()
+    await message.answer(f"✅ Promokod <b>{data['code']}</b> ({discount}%) saqlandi!", parse_mode="HTML", reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="◀️ Admin panel", callback_data="admin_menu")]]))

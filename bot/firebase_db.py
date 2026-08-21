@@ -247,3 +247,52 @@ def listen_to_new_orders(callback):
     # Watch the collection
     orders_watch = db.collection("orders").on_snapshot(on_snapshot)
     return orders_watch
+
+# ─── Users ────────────────────────────────────────────────────
+
+def get_all_users():
+    docs = db.collection("users").get()
+    users = []
+    for doc in docs:
+        d = doc.to_dict()
+        d["id"] = doc.id
+        users.append(d)
+    return users
+
+# ─── Promocodes ───────────────────────────────────────────────
+
+def get_promocodes():
+    docs = db.collection("promocodes").get()
+    codes = []
+    for doc in docs:
+        d = doc.to_dict()
+        d["id"] = doc.id
+        codes.append(d)
+    return codes
+
+def add_promocode(code: str, discount: int):
+    doc_ref = db.collection("promocodes").document()
+    doc_ref.set({
+        "code": code.upper(),
+        "discountPercent": discount,
+        "active": True,
+        "usageCount": 0
+    })
+    return doc_ref.id
+
+def delete_promocode(code_id: str):
+    db.collection("promocodes").document(code_id).delete()
+
+# ─── Notifications ────────────────────────────────────────────
+
+def send_notification(user_id: int, title: str, body: str, type: str = 'system'):
+    from datetime import datetime
+    doc_ref = db.collection("notifications").document()
+    doc_ref.set({
+        "userId": user_id,
+        "title": title,
+        "body": body,
+        "date": datetime.now().strftime("%d %b, %H:%M"),
+        "read": False,
+        "type": type
+    })
