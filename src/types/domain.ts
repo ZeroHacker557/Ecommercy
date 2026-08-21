@@ -30,6 +30,8 @@ export type Order = {
   products: { product: Product; quantity: number }[]
   total: number
   status: OrderStatus
+  paymentMethod?: 'Naqd' | 'Karta'
+  paymentStatus?: 'Tolangan' | 'Kutilmoqda' | 'Rad etildi'
   customer: OrderForm
   userId?: number
   username?: string
@@ -41,6 +43,7 @@ export type OrderForm = {
   address: string
   location: { lat: number; lng: number } | null
   comment: string
+  paymentMethod: 'Naqd' | 'Karta'
 }
 
 export type ProductActions = {

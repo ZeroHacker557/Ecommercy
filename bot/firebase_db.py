@@ -171,6 +171,50 @@ def update_order_status(order_id: str, new_status: str):
         return False
 
 
+def update_payment_status(order_id: str, payment_status: str):
+    """To'lov statusini yangilash"""
+    try:
+        docs = db.collection("orders").where("id", "==", order_id).get()
+        for doc in docs:
+            doc.reference.update({"paymentStatus": payment_status})
+            print(f"[OK] Order {order_id} payment status updated to {payment_status}")
+            return True
+        return False
+    except Exception as e:
+        print(f"[ERR] Failed to update payment status: {e}")
+        return False
+
+
+def get_order_by_id(order_id: str):
+    """order_id maydoni bo'yicha buyurtmani olish"""
+    try:
+        docs = db.collection("orders").where("id", "==", order_id).get()
+        for doc in docs:
+            d = doc.to_dict()
+            d["_doc_id"] = doc.id
+            return d
+        return None
+    except Exception as e:
+        print(f"[ERR] get_order_by_id: {e}")
+        return None
+
+
+def get_user_orders(user_id: int):
+    """Foydalanuvchining barcha buyurtmalarini olish"""
+    try:
+        docs = db.collection("orders").where("userId", "==", user_id).get()
+        orders = []
+        for doc in docs:
+            d = doc.to_dict()
+            d["_doc_id"] = doc.id
+            orders.append(d)
+        orders.sort(key=lambda x: x.get("createdAt", ""), reverse=True)
+        return orders
+    except Exception as e:
+        print(f"[ERR] get_user_orders: {e}")
+        return []
+
+
 def listen_to_new_orders(callback):
     """
     Listens for new orders in Firestore and triggers the callback.
@@ -187,11 +231,12 @@ def listen_to_new_orders(callback):
                 # Check if this is a newly created order (within the last few minutes)
                 # We skip old orders to avoid spamming on bot restart
                 from datetime import datetime, timezone
-                import dateutil.parser
                 
                 try:
                     if 'createdAt' in order_data:
-                        created_dt = dateutil.parser.isoparse(order_data['createdAt'])
+                        # Replace Z with +00:00 for Python 3.10 compatibility
+                        time_str = order_data['createdAt'].replace('Z', '+00:00')
+                        created_dt = datetime.fromisoformat(time_str)
                         now = datetime.now(timezone.utc)
                         diff = (now - created_dt).total_seconds()
                         if diff < 120: # 2 minutes

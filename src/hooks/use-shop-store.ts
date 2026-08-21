@@ -42,7 +42,7 @@ export function useShopStore() {
   const [myOrders, setMyOrders] = useState<Order[]>(loadOrders)
   const [checkoutDone, setCheckoutDone] = useState(false)
   const [orderForm, setOrderForm] = useState<OrderForm>({
-    name: '', phone: '', address: '', location: null, comment: '',
+    name: '', phone: '', address: '', location: null, comment: '', paymentMethod: 'Naqd',
   })
 
   // Initialize Telegram & Firebase real-time subscriptions
@@ -189,6 +189,8 @@ export function useShopStore() {
       products: cartProducts,
       total: cartTotal,
       status: 'Yangi',
+      paymentMethod: orderForm.paymentMethod,
+      paymentStatus: orderForm.paymentMethod === 'Karta' ? 'Kutilmoqda' : undefined,
       customer: { ...orderForm },
       userId: tgUser?.id,
       username: tgUser?.username || tgUser?.first_name,
@@ -199,7 +201,7 @@ export function useShopStore() {
 
     // Reset
     setCartItems({})
-    setOrderForm({ name: '', phone: '', address: '', location: null, comment: '' })
+    setOrderForm({ name: '', phone: '', address: '', location: null, comment: '', paymentMethod: 'Naqd' })
     setCheckoutDone(true)
     hapticSuccess()
     notify('Buyurtma muvaffaqiyatli berildi! ✓')

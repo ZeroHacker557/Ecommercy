@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ArrowLeft, MapPin, MessageSquare, Phone, Send, ShoppingBag, User, Navigation } from 'lucide-react'
+import { ArrowLeft, Copy, Check, MapPin, MessageSquare, Phone, Send, ShoppingBag, User, Navigation, CreditCard, Banknote } from 'lucide-react'
 import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet'
 import { formatPrice } from '../data'
 import { getImageUrl, hapticFeedback } from '../utils/telegram'
@@ -75,9 +75,17 @@ function LocationPicker({ location, onChange }: { location: { lat: number; lng: 
 }
 
 export function CheckoutPage({ cartProducts, cartTotal, orderForm, onUpdateForm, onSubmit, onBack }: Props) {
+  const [copied, setCopied] = useState(false)
+
+  const handleCopy = (text: string) => {
+    navigator.clipboard.writeText(text).then(() => {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    })
+  }
+
   const handleSubmit = async () => {
     await onSubmit()
-    // Navigation handled by store
   }
 
   const isValid = orderForm.name.trim() && orderForm.phone.trim() && orderForm.address.trim()
@@ -214,6 +222,76 @@ export function CheckoutPage({ cartProducts, cartTotal, orderForm, onUpdateForm,
               </div>
             </div>
           </div>
+        </section>
+
+        {/* ── Payment Method ───────────────────────────── */}
+        <section className="mt-6" style={{ animation: 'fadeInUp 0.4s ease 0.2s both' }}>
+          <h3 className="mb-4 font-bold" style={{ color: '#111426' }}>To'lov usuli</h3>
+
+          <div className="flex gap-3">
+            {/* Naqd */}
+            <button
+              type="button"
+              onClick={() => onUpdateForm('paymentMethod', 'Naqd')}
+              className="flex flex-1 flex-col items-center gap-2 rounded-2xl border-2 py-4 transition-all"
+              style={{
+                borderColor: orderForm.paymentMethod === 'Naqd' ? '#7c3aed' : '#e2e8f0',
+                background: orderForm.paymentMethod === 'Naqd' ? '#f5f0ff' : '#fafafa',
+              }}
+            >
+              <Banknote size={26} style={{ color: orderForm.paymentMethod === 'Naqd' ? '#7c3aed' : '#94a3b8' }} />
+              <span className="text-sm font-bold" style={{ color: orderForm.paymentMethod === 'Naqd' ? '#7c3aed' : '#64748b' }}>💵 Naqd pul</span>
+              <span className="text-xs" style={{ color: '#94a3b8' }}>Yetkazganda</span>
+            </button>
+
+            {/* Karta */}
+            <button
+              type="button"
+              onClick={() => onUpdateForm('paymentMethod', 'Karta')}
+              className="flex flex-1 flex-col items-center gap-2 rounded-2xl border-2 py-4 transition-all"
+              style={{
+                borderColor: orderForm.paymentMethod === 'Karta' ? '#7c3aed' : '#e2e8f0',
+                background: orderForm.paymentMethod === 'Karta' ? '#f5f0ff' : '#fafafa',
+              }}
+            >
+              <CreditCard size={26} style={{ color: orderForm.paymentMethod === 'Karta' ? '#7c3aed' : '#94a3b8' }} />
+              <span className="text-sm font-bold" style={{ color: orderForm.paymentMethod === 'Karta' ? '#7c3aed' : '#64748b' }}>💳 Karta</span>
+              <span className="text-xs" style={{ color: '#94a3b8' }}>O'tkazma</span>
+            </button>
+          </div>
+
+          {/* Karta tanlanganda yo'riqnoma */}
+          {orderForm.paymentMethod === 'Karta' && (
+            <div
+              className="mt-4 rounded-2xl border-2 p-4"
+              style={{ borderColor: '#7c3aed', background: '#f5f0ff', animation: 'fadeInUp 0.3s ease' }}
+            >
+              <p className="mb-3 text-sm font-bold" style={{ color: '#7c3aed' }}>💳 Karta ma'lumotlari:</p>
+
+              <div className="flex items-center justify-between rounded-xl px-3 py-2" style={{ background: '#fff', border: '1px solid #e2e8f0' }}>
+                <div>
+                  <p className="text-xs" style={{ color: '#64748b' }}>Karta raqami</p>
+                  <p className="font-mono text-sm font-bold" style={{ color: '#111426' }}>KARTA_RAQAMINGIZ</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handleCopy('KARTA_RAQAMINGIZ')}
+                  className="grid size-9 place-items-center rounded-xl transition active:scale-90"
+                  style={{ background: copied ? '#dcfce7' : '#f1f5f9', color: copied ? '#16a34a' : '#7c3aed' }}
+                >
+                  {copied ? <Check size={18} /> : <Copy size={18} />}
+                </button>
+              </div>
+
+              <div className="mt-3 flex items-start gap-2 rounded-xl p-3" style={{ background: '#fffbeb', border: '1px solid #fde68a' }}>
+                <span className="text-base">📌</span>
+                <p className="text-xs leading-relaxed" style={{ color: '#92400e' }}>
+                  Pul o'tkazganingizdan so'ng, <b>to'lov chekini (screenshot)</b> botga yuboring.
+                  Admin tekshirib, buyurtmangizni tasdiqlaydi.
+                </p>
+              </div>
+            </div>
+          )}
         </section>
 
         {/* Submit Button */}
