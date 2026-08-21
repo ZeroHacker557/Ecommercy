@@ -1,5 +1,5 @@
 import { initializeApp } from 'firebase/app'
-import { getFirestore, collection, addDoc, onSnapshot, query, where, doc, setDoc, updateDoc } from 'firebase/firestore'
+import { getFirestore, collection, addDoc, onSnapshot, query, where, doc, setDoc, updateDoc, writeBatch, getDocs } from 'firebase/firestore'
 import { getStorage } from 'firebase/storage'
 import type { Product, Category, Order } from '../types/domain'
 
@@ -205,6 +205,42 @@ export function subscribeToUserReviews(userId: number, callback: (reviews: Revie
     reviews.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
     callback(reviews)
   }, (error) => {
+  }, (error) => {
     console.error("Error fetching user reviews:", error)
   })
+}
+
+// ==========================================
+// NOTIFICATIONS
+// ==========================================
+
+export function subscribeToUserNotifications(userId: number, callback: (notifications: any[]) => void) {
+  const q = query(
+    collection(db, 'notifications'),
+    where('userId', '==', userId)
+  )
+  return onSnapshot(q, (snapshot) => {
+    const notifs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))
+    // Sort in memory by date desc (if real string dates)
+    notifs.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+    callback(notifs)
+  })
+}
+
+export async function markNotificationsAsRead(userId: number) {
+  try {
+    const q = query(
+      collection(db, 'notifications'),
+      where('userId', '==', userId),
+      where('read', '==', false)
+    )
+    const snapshot = await getDocs(q)
+    const batch = writeBatch(db)
+    snapshot.docs.forEach(docSnap => {
+      batch.update(docSnap.ref, { read: true })
+    })
+    await batch.commit()
+  } catch (e) {
+    console.error('Error marking notifications as read', e)
+  }
 }

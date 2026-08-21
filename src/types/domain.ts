@@ -1,4 +1,4 @@
-export type AppPage = 'home' | 'catalog' | 'favorites' | 'orders' | 'profile' | 'detail' | 'checkout' | 'addresses' | 'profile_edit' | 'reviews'
+export type AppPage = 'home' | 'catalog' | 'favorites' | 'orders' | 'profile' | 'detail' | 'checkout' | 'addresses' | 'profile_edit' | 'reviews' | 'notifications'
 
 export type Product = {
   id: number
@@ -45,6 +45,7 @@ export type OrderForm = {
   location: { lat: number; lng: number } | null
   comment: string
   paymentMethod: 'Naqd' | 'Karta'
+  promoCode?: string
 }
 
 export type ProductActions = {
@@ -83,4 +84,22 @@ export type Review = {
   rating: number // 1 to 5
   comment: string
   date: string
+}
+
+export type Notification = {
+  id: string
+  userId: number
+  title: string
+  body: string
+  date: string
+  read: boolean
+  type: 'order' | 'system' | 'promo'
+}
+
+export type PromoCode = {
+  id: string
+  code: string
+  discountPercent: number
+  active: boolean
+  usageCount: number
 }

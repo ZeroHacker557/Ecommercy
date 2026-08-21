@@ -34,10 +34,10 @@ type Props = ProductActions & {
   onSearch: () => void
   onNavigate: (page: AppPage) => void
   onOpenCart: () => void
-  onNotify: (message: string) => void
+  unreadNotificationsCount: number
 }
 
-export function HomePage({ products, categories, loading, cartCount, onSearch, onNavigate, onOpenCart, onNotify, ...productActions }: Props) {
+export function HomePage({ products, categories, loading, cartCount, onSearch, onNavigate, onOpenCart, unreadNotificationsCount, ...productActions }: Props) {
   const carouselItems = [...defaultCategories, ...defaultCategories]
 
   return (
@@ -53,8 +53,13 @@ export function HomePage({ products, categories, loading, cartCount, onSearch, o
           </b>
         </div>
         <div className="flex items-center gap-2">
-          <IconButton label="Bildirishnomalar" onClick={() => onNotify('Yangi bildirishnomalar yo\'q')}>
-            <Bell />
+          <IconButton label="Bildirishnomalar" onClick={() => onNavigate('notifications')}>
+            <span className="relative">
+              <Bell />
+              {unreadNotificationsCount > 0 && (
+                <span className="absolute right-0 top-0 size-2.5 rounded-full border-2 border-white bg-red-500" />
+              )}
+            </span>
           </IconButton>
           <IconButton label="Sevimlilar" onClick={() => onNavigate('favorites')}>
             <Heart />

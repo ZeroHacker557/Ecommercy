@@ -14,6 +14,8 @@ import { ProfilePage } from './pages/ProfilePage'
 import { AddressesPage } from './pages/AddressesPage'
 import { ProfileEditPage } from './pages/ProfileEditPage'
 import { ReviewsPage } from './pages/ReviewsPage'
+import { NotificationsPage } from './pages/NotificationsPage'
+
 function App() {
   const shop = useShopStore()
   const productActions = {
@@ -64,10 +66,10 @@ function App() {
                 loading={shop.loading}
                 {...productActions}
                 cartCount={shop.cartCount}
+                unreadNotificationsCount={shop.unreadNotificationsCount}
                 onSearch={() => shop.setSearchOpen(true)}
                 onNavigate={shop.navigate}
                 onOpenCart={shop.openCart}
-                onNotify={shop.notify}
               />
             </div>
           )}
@@ -163,10 +165,19 @@ function App() {
               />
             </div>
           )}
+          {shop.page === 'notifications' && (
+            <div className="page-animate">
+              <NotificationsPage
+                notifications={shop.notifications}
+                onBack={() => shop.navigate('profile')}
+                onNavigate={shop.navigate}
+              />
+            </div>
+          )}
         </div>
 
         {/* Bottom Navigation */}
-        {!['detail', 'checkout', 'addresses', 'profile_edit', 'reviews'].includes(shop.page) && (
+        {!['detail', 'checkout', 'addresses', 'profile_edit', 'reviews', 'notifications'].includes(shop.page) && (
           <BottomNav page={shop.page} onNavigate={shop.navigate} cartCount={shop.cartCount} />
         )}
       </div>

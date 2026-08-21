@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { formatPrice } from '../data'
-import { subscribeToCategories, subscribeToProducts, sendOrderToFirestore, saveUserToFirestore, subscribeToUserOrders, subscribeToUserProfile } from '../lib/firebase'
-import type { AppPage, Category, Order, OrderForm, Product, UserProfile } from '../types/domain'
+import { subscribeToCategories, subscribeToProducts, sendOrderToFirestore, saveUserToFirestore, subscribeToUserOrders, subscribeToUserProfile, subscribeToUserNotifications, markNotificationsAsRead } from '../lib/firebase'
+import type { AppPage, Category, Order, OrderForm, Product, UserProfile, Notification } from '../types/domain'
 import { hapticFeedback, hapticSuccess, initTelegram, getTelegramUser } from '../utils/telegram'
 
 const ORDERS_KEY = 'shopOnlineOrders'
@@ -45,6 +45,8 @@ export function useShopStore() {
     name: '', phone: '', address: '', location: null, comment: '', paymentMethod: 'Naqd',
   })
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null)
+  const [notifications, setNotifications] = useState<Notification[]>([])
+  const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0)
 
   // Initialize Telegram & Firebase real-time subscriptions
   useEffect(() => {
@@ -76,15 +78,19 @@ export function useShopStore() {
       () => {}
     )
 
-    // 3. Subscribe to User Orders & Profile
     let unsubOrders: (() => void) | undefined
     let unsubProfile: (() => void) | undefined
+    let unsubNotifications: (() => void) | undefined
     if (tgUser) {
       unsubOrders = subscribeToUserOrders(tgUser.id, (orders) => {
         setMyOrders(orders)
       })
       unsubProfile = subscribeToUserProfile(tgUser.id, (profile) => {
         if (profile) setUserProfile(profile as UserProfile)
+      })
+      unsubNotifications = subscribeToUserNotifications(tgUser.id, (notifs) => {
+        setNotifications(notifs)
+        setUnreadNotificationsCount(notifs.filter((n: Notification) => !n.read).length)
       })
     }
 
@@ -93,6 +99,7 @@ export function useShopStore() {
       unsubCats()
       if (unsubOrders) unsubOrders()
       if (unsubProfile) unsubProfile()
+      if (unsubNotifications) unsubNotifications()
     }
   }, [])
 
@@ -122,6 +129,10 @@ export function useShopStore() {
   )
 
   const navigate = useCallback((nextPage: AppPage) => {
+    const tgUser = getTelegramUser()
+    if (nextPage === 'notifications' && tgUser) {
+      markNotificationsAsRead(tgUser.id)
+    }
     setPage(nextPage)
     setCartOpen(false)
     setSearchOpen(false)
@@ -189,7 +200,7 @@ export function useShopStore() {
     setOrderForm((prev) => ({ ...prev, [field]: value }))
   }, [])
 
-  const submitOrder = useCallback(async () => {
+  const submitOrder = useCallback(async (finalTotal: number) => {
     if (!orderForm.name || !orderForm.phone || !orderForm.address) {
       notify('Iltimos, barcha maydonlarni to\'ldiring')
       return false
@@ -205,7 +216,7 @@ export function useShopStore() {
       id: `#${Date.now().toString().slice(-7)}`,
       date: dateStr,
       products: cartProducts,
-      total: cartTotal,
+      total: finalTotal,
       status: 'Yangi',
       paymentMethod: orderForm.paymentMethod,
       paymentStatus: orderForm.paymentMethod === 'Karta' ? 'Kutilmoqda' : undefined,
@@ -234,6 +245,7 @@ export function useShopStore() {
     likedIds, selectedProduct,
     isSearchOpen, isCartOpen, query, searchResults, toast,
     myOrders, checkoutDone, orderForm, userProfile,
+    notifications, unreadNotificationsCount,
     navigate, openProduct, toggleLike,
     setSearchOpen, setQuery,
     addToCart, updateCartQuantity,

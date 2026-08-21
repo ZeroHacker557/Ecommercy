@@ -1,5 +1,5 @@
 import type { LucideIcon } from 'lucide-react'
-import { Bell, ChevronRight, CircleHelp, ClipboardList, MapPin, Settings, ShieldCheck, Star, UserRound } from 'lucide-react'
+import { Bell, ChevronRight, CircleHelp, ClipboardList, MapPin, ShieldCheck, Star, UserRound } from 'lucide-react'
 import { formatPrice } from '../data'
 import { IconButton } from '../components/ui/IconButton'
 import { OrderImages } from '../components/order/OrderImages'
@@ -36,11 +36,8 @@ export function ProfilePage({ profile, orders, onNavigate, onNotify }: Props) {
       <header className="flex items-center justify-between px-5 pt-8 sm:px-10">
         <h1 className="text-3xl font-extrabold" style={{ color: '#111426' }}>Profil</h1>
         <div className="flex gap-1">
-          <IconButton label="Bildirishnomalar" onClick={() => onNotify('Yangi bildirishnomalar yo\'q')}>
+          <IconButton label="Bildirishnomalar" onClick={() => onNavigate('notifications')}>
             <Bell />
-          </IconButton>
-          <IconButton label="Sozlamalar" onClick={() => onNotify('Sozlamalar tez orada!')}>
-            <Settings />
           </IconButton>
         </div>
       </header>

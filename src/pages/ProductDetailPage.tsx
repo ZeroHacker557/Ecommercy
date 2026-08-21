@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { ArrowLeft, Heart, Minus, Plus, ShoppingCart, Star, Truck, UserRound, MessageSquare } from 'lucide-react'
 import { formatPrice } from '../data'
 import { getImageUrl, hapticSuccess, getTelegramUser } from '../utils/telegram'
@@ -261,31 +262,34 @@ export function ProductDetailPage({ product, onAddToCart, onBack, likedIds, onTo
         </section>
       </section>
 
-      {/* Bottom Bar */}
-      <div className="fixed bottom-0 left-0 right-0 z-20 border-t p-4" style={{ borderColor: '#f1f5f9', background: 'rgba(255,255,255,0.97)', backdropFilter: 'blur(12px)' }}>
-        <div className="mx-auto flex max-w-[1120px] items-center gap-3 sm:gap-4">
-          <div className="hidden sm:block">
-            <b className="text-xl" style={{ color: '#111426' }}>{formatPrice(product.price)}</b>
-          </div>
-          <div className="flex items-center gap-2 rounded-2xl p-1.5 sm:gap-3 sm:p-2" style={{ background: '#f8fafc' }}>
-            <button onClick={() => setCount(Math.max(1, count - 1))} className="grid size-8 place-items-center rounded-lg transition hover:bg-white active:scale-90" style={{ color: '#111426' }}>
-              <Minus size={18} />
+      {/* Bottom Bar via Portal to avoid CSS containing block issues */}
+      {createPortal(
+        <div className="fixed bottom-0 left-0 right-0 z-[100] border-t p-4" style={{ borderColor: '#f1f5f9', background: 'rgba(255,255,255,0.97)', backdropFilter: 'blur(12px)' }}>
+          <div className="mx-auto flex max-w-[1120px] items-center gap-3 sm:gap-4">
+            <div className="hidden sm:block">
+              <b className="text-xl" style={{ color: '#111426' }}>{formatPrice(product.price)}</b>
+            </div>
+            <div className="flex items-center gap-2 rounded-2xl p-1.5 sm:gap-3 sm:p-2" style={{ background: '#f8fafc' }}>
+              <button onClick={() => setCount(Math.max(1, count - 1))} className="grid size-8 place-items-center rounded-lg transition hover:bg-white active:scale-90" style={{ color: '#111426' }}>
+                <Minus size={18} />
+              </button>
+              <b className="w-5 text-center" style={{ color: '#111426' }}>{count}</b>
+              <button onClick={() => setCount(count + 1)} className="grid size-8 place-items-center rounded-lg transition hover:bg-white active:scale-90" style={{ color: '#111426' }}>
+                <Plus size={18} />
+              </button>
+            </div>
+            <button
+              onClick={handleAddToCart}
+              className="ml-auto flex flex-1 items-center justify-center gap-2 rounded-2xl py-3.5 font-bold shadow-lg transition hover:-translate-y-0.5 hover:shadow-xl active:scale-[0.98] sm:gap-3 sm:py-4"
+              style={{ background: 'linear-gradient(135deg, #6d28d9, #7c3aed)', color: '#fff', boxShadow: '0 8px 24px rgba(109, 40, 217, 0.25)' }}
+            >
+              <ShoppingCart size={20} />
+              <span className="text-sm sm:text-base">Savatchaga qo'shish</span>
             </button>
-            <b className="w-5 text-center" style={{ color: '#111426' }}>{count}</b>
-            <button onClick={() => setCount(count + 1)} className="grid size-8 place-items-center rounded-lg transition hover:bg-white active:scale-90" style={{ color: '#111426' }}>
-              <Plus size={18} />
-            </button>
           </div>
-          <button
-            onClick={handleAddToCart}
-            className="ml-auto flex flex-1 items-center justify-center gap-2 rounded-2xl py-3.5 font-bold shadow-lg transition hover:-translate-y-0.5 hover:shadow-xl active:scale-[0.98] sm:gap-3 sm:py-4"
-            style={{ background: 'linear-gradient(135deg, #6d28d9, #7c3aed)', color: '#fff', boxShadow: '0 8px 24px rgba(109, 40, 217, 0.25)' }}
-          >
-            <ShoppingCart size={20} />
-            <span className="text-sm sm:text-base">Savatchaga qo'shish</span>
-          </button>
-        </div>
-      </div>
+        </div>,
+        document.body
+      )}
     </>
   )
 }

@@ -1,8 +1,11 @@
 import { useState } from 'react'
-import { ArrowLeft, Copy, Check, MapPin, MessageSquare, Phone, Send, ShoppingBag, User, CreditCard, Banknote } from 'lucide-react'
+import { createPortal } from 'react-dom'
+import { ArrowLeft, Copy, Check, MapPin, MessageSquare, Phone, Send, ShoppingBag, User, CreditCard, Banknote, Tag, Loader2 } from 'lucide-react'
 import { formatPrice } from '../data'
 import { getImageUrl, hapticFeedback } from '../utils/telegram'
-import type { OrderForm, Product } from '../types/domain'
+import { db } from '../lib/firebase'
+import { collection, query, where, getDocs } from 'firebase/firestore'
+import type { OrderForm, Product, PromoCode } from '../types/domain'
 import L from 'leaflet'
 
 // Fix Leaflet default icon issue
@@ -22,14 +25,20 @@ type Props = {
   cartTotal: number
   orderForm: OrderForm
   onUpdateForm: (field: keyof OrderForm, value: any) => void
-  onSubmit: () => Promise<boolean>
+  onSubmit: (finalTotal: number) => Promise<boolean>
   onBack: () => void
   onNavigate: (page: import('../types/domain').AppPage) => void
 }
 
 export function CheckoutPage({ profile, cartProducts, cartTotal, orderForm, onUpdateForm, onSubmit, onBack, onNavigate }: Props) {
   const [copied, setCopied] = useState(false)
+  const [promoInput, setPromoInput] = useState('')
+  const [promoLoading, setPromoLoading] = useState(false)
+  const [appliedPromo, setAppliedPromo] = useState<PromoCode | null>(null)
+  const [promoError, setPromoError] = useState('')
   const addresses = profile?.addresses || []
+
+  const finalTotal = appliedPromo ? cartTotal * (1 - appliedPromo.discountPercent / 100) : cartTotal
 
   // Avtomatik to'ldirish
   if (!orderForm.name && profile?.first_name) {
@@ -46,8 +55,30 @@ export function CheckoutPage({ profile, cartProducts, cartTotal, orderForm, onUp
     })
   }
 
+  const handleApplyPromo = async () => {
+    if (!promoInput.trim()) return
+    setPromoLoading(true)
+    setPromoError('')
+    try {
+      const q = query(collection(db, 'promocodes'), where('code', '==', promoInput.trim().toUpperCase()), where('active', '==', true))
+      const snap = await getDocs(q)
+      if (snap.empty) {
+        setPromoError('Noto\'g\'ri yoki muddati o\'tgan kod')
+        setAppliedPromo(null)
+      } else {
+        const promoData = { id: snap.docs[0].id, ...snap.docs[0].data() } as PromoCode
+        setAppliedPromo(promoData)
+        setPromoError('')
+        onUpdateForm('promoCode', promoData.code) // Custom logic to save promo code if needed
+      }
+    } catch (e) {
+      setPromoError('Xatolik yuz berdi')
+    }
+    setPromoLoading(false)
+  }
+
   const handleSubmit = async () => {
-    await onSubmit()
+    await onSubmit(finalTotal)
   }
 
   const isValid = orderForm.name.trim() && orderForm.phone.trim() && orderForm.address.trim()
@@ -98,8 +129,52 @@ export function CheckoutPage({ profile, cartProducts, cartTotal, orderForm, onUp
             ))}
           </div>
           <div className="mt-4 flex justify-between border-t pt-3" style={{ borderColor: '#f1f5f9' }}>
-            <span className="font-bold" style={{ color: '#111426' }}>Jami:</span>
-            <b className="text-lg" style={{ color: '#7c3aed' }}>{formatPrice(cartTotal)}</b>
+          <div className="mt-4 border-t pt-3" style={{ borderColor: '#f1f5f9' }}>
+            {/* Promo Code Input */}
+            <div className="mb-3 flex items-start gap-2">
+              <div className="flex-1">
+                <div className="flex h-11 items-center gap-2 rounded-xl border px-3 transition-all focus-within:border-violet-300 focus-within:shadow-md focus-within:shadow-violet-100" style={{ borderColor: appliedPromo ? '#10b981' : promoError ? '#ef4444' : '#e2e8f0', background: '#fafafa' }}>
+                  <Tag size={16} style={{ color: appliedPromo ? '#10b981' : '#94a3b8' }} />
+                  <input
+                    value={promoInput}
+                    onChange={(e) => { setPromoInput(e.target.value.toUpperCase()); setPromoError(''); setAppliedPromo(null); }}
+                    placeholder="Promokod (agar bo'lsa)"
+                    className="h-full w-full bg-transparent text-sm font-bold outline-none"
+                    style={{ color: appliedPromo ? '#10b981' : '#111426' }}
+                    readOnly={!!appliedPromo}
+                  />
+                </div>
+                {promoError && <p className="mt-1 pl-1 text-[10px] font-bold text-red-500">{promoError}</p>}
+                {appliedPromo && <p className="mt-1 pl-1 text-[10px] font-bold text-emerald-500">Kiritildi: {appliedPromo.discountPercent}% chegirma!</p>}
+              </div>
+              {!appliedPromo ? (
+                <button
+                  onClick={handleApplyPromo}
+                  disabled={!promoInput.trim() || promoLoading}
+                  className="grid h-11 w-20 place-items-center rounded-xl text-sm font-bold text-white transition hover:opacity-90 disabled:opacity-50"
+                  style={{ background: '#7c3aed' }}
+                >
+                  {promoLoading ? <Loader2 size={16} className="animate-spin" /> : 'Qo\'llash'}
+                </button>
+              ) : (
+                <button
+                  onClick={() => { setAppliedPromo(null); setPromoInput(''); }}
+                  className="grid h-11 w-20 place-items-center rounded-xl text-sm font-bold text-slate-500 transition hover:bg-slate-100 border border-slate-200"
+                >
+                  Bekor q.
+                </button>
+              )}
+            </div>
+
+            <div className="flex justify-between items-center">
+              <span className="font-bold" style={{ color: '#111426' }}>Jami:</span>
+              <div className="text-right">
+                {appliedPromo && (
+                  <b className="text-sm line-through block" style={{ color: '#94a3b8' }}>{formatPrice(cartTotal)}</b>
+                )}
+                <b className="text-lg" style={{ color: appliedPromo ? '#10b981' : '#7c3aed' }}>{formatPrice(finalTotal)}</b>
+              </div>
+            </div>
           </div>
         </section>
 
