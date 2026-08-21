@@ -271,11 +271,11 @@ export function CheckoutPage({ cartProducts, cartTotal, orderForm, onUpdateForm,
               <div className="flex items-center justify-between rounded-xl px-3 py-2" style={{ background: '#fff', border: '1px solid #e2e8f0' }}>
                 <div>
                   <p className="text-xs" style={{ color: '#64748b' }}>Karta raqami</p>
-                  <p className="font-mono text-sm font-bold" style={{ color: '#111426' }}>KARTA_RAQAMINGIZ</p>
+                  <p className="font-mono text-sm font-bold" style={{ color: '#111426' }}>5614 6818 1872 7921</p>
                 </div>
                 <button
                   type="button"
-                  onClick={() => handleCopy('KARTA_RAQAMINGIZ')}
+                  onClick={() => handleCopy('5614 6818 1872 7921')}
                   className="grid size-9 place-items-center rounded-xl transition active:scale-90"
                   style={{ background: copied ? '#dcfce7' : '#f1f5f9', color: copied ? '#16a34a' : '#7c3aed' }}
                 >
@@ -286,7 +286,8 @@ export function CheckoutPage({ cartProducts, cartTotal, orderForm, onUpdateForm,
               <div className="mt-3 flex items-start gap-2 rounded-xl p-3" style={{ background: '#fffbeb', border: '1px solid #fde68a' }}>
                 <span className="text-base">📌</span>
                 <p className="text-xs leading-relaxed" style={{ color: '#92400e' }}>
-                  Pul o'tkazganingizdan so'ng, <b>to'lov chekini (screenshot)</b> botga yuboring.
+                  Formani to'ldirganingizdan so'ng, <b>bot orqali sizga xabar keladi.</b>{' '}
+                  To'lov chekini (screenshot) botga yuboring.
                   Admin tekshirib, buyurtmangizni tasdiqlaydi.
                 </p>
               </div>

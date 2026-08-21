@@ -7,6 +7,6 @@ API_PORT = 8080
 IMAGES_DIR = "images"
 DB_FILE = "database.json"
 
-# To'lov sozlamalari (karta raqamingizni kiriting)
-CARD_NUMBER = "8600 XXXX XXXX XXXX"   # <-- O'zgartiring
-CARD_OWNER  = "Ism Familiya"           # <-- O'zgartiring
+# To'lov sozlamalari
+CARD_NUMBER = "5614 6818 1872 7921"
+CARD_OWNER  = "Ism Familiya"   # <-- ismingizni kiriting
