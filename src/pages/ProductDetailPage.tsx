@@ -178,87 +178,87 @@ export function ProductDetailPage({ product, onAddToCart, onBack, likedIds, onTo
             <p className="mt-4 text-sm leading-7" style={{ color: '#64748b' }}>{product.description}</p>
           </section>
         )}
-      </section>
 
-      {/* Reviews Section */}
-      <section className="mx-5 mb-32 mt-5 rounded-[28px] border border-slate-100 bg-white p-6 shadow-sm sm:mx-10 page-animate">
-        <h3 className="text-xl font-bold" style={{ color: '#111426' }}>Sharhlar</h3>
-        
-        {/* Write Review Form */}
-        <form onSubmit={handleSubmitReview} className="mt-5 rounded-2xl border border-slate-200 bg-slate-50 p-4">
-          <p className="text-sm font-bold text-slate-700 mb-2">Mahsulotni baholang:</p>
-          <div className="flex gap-2 mb-4">
-            {[1, 2, 3, 4, 5].map((star) => (
-              <button 
-                key={star} 
-                type="button" 
-                onClick={() => setUserRating(star)}
-                className="transition hover:scale-110 active:scale-95"
-              >
-                <Star 
-                  size={28} 
-                  fill={star <= userRating ? "#fbbf24" : "none"} 
-                  color={star <= userRating ? "#fbbf24" : "#cbd5e1"} 
-                />
-              </button>
-            ))}
-          </div>
+        {/* Reviews Section */}
+        <section className="mt-8">
+          <h3 className="text-xl font-bold" style={{ color: '#111426' }}>Sharhlar</h3>
           
-          <div className="flex items-start gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 focus-within:border-purple-300 focus-within:ring-2 focus-within:ring-purple-100 transition-all">
-            <MessageSquare size={20} className="mt-0.5 shrink-0 text-slate-400" />
-            <textarea
-              value={userComment}
-              onChange={(e) => setUserComment(e.target.value)}
-              placeholder="O'z fikringizni yozib qoldiring (ixtiyoriy)..."
-              rows={2}
-              className="w-full resize-none bg-transparent text-sm text-slate-800 outline-none"
-            />
-          </div>
-          
-          <button
-            type="submit"
-            disabled={isSubmitting || userRating === 0}
-            className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-purple-600 py-3 text-sm font-bold text-white transition hover:bg-purple-700 active:scale-95 disabled:opacity-50"
-          >
-            {isSubmitting ? "Yuborilmoqda..." : "Sharh qoldirish"}
-          </button>
-        </form>
+          {/* Write Review Form */}
+          <form onSubmit={handleSubmitReview} className="mt-5 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+            <p className="text-sm font-bold text-slate-700 mb-2">Mahsulotni baholang:</p>
+            <div className="flex gap-2 mb-4">
+              {[1, 2, 3, 4, 5].map((star) => (
+                <button 
+                  key={star} 
+                  type="button" 
+                  onClick={() => setUserRating(star)}
+                  className="transition hover:scale-110 active:scale-95"
+                >
+                  <Star 
+                    size={28} 
+                    fill={star <= userRating ? "#fbbf24" : "none"} 
+                    color={star <= userRating ? "#fbbf24" : "#cbd5e1"} 
+                  />
+                </button>
+              ))}
+            </div>
+            
+            <div className="flex items-start gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 focus-within:border-purple-300 focus-within:ring-2 focus-within:ring-purple-100 transition-all">
+              <MessageSquare size={20} className="mt-0.5 shrink-0 text-slate-400" />
+              <textarea
+                value={userComment}
+                onChange={(e) => setUserComment(e.target.value)}
+                placeholder="O'z fikringizni yozib qoldiring (ixtiyoriy)..."
+                rows={2}
+                className="w-full resize-none bg-transparent text-sm text-slate-800 outline-none"
+              />
+            </div>
+            
+            <button
+              type="submit"
+              disabled={isSubmitting || userRating === 0}
+              className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-purple-600 py-3 text-sm font-bold text-white transition hover:bg-purple-700 active:scale-95 disabled:opacity-50"
+            >
+              {isSubmitting ? "Yuborilmoqda..." : "Sharh qoldirish"}
+            </button>
+          </form>
 
-        {/* Reviews List */}
-        <div className="mt-6 space-y-4">
-          {reviews.length === 0 ? (
-            <p className="text-center text-sm text-slate-500 py-4">Hozircha sharhlar yo'q. Birinchi bo'lib baholang!</p>
-          ) : (
-            reviews.map(review => (
-              <div key={review.id} className="border-b border-slate-100 pb-4 last:border-0 last:pb-0">
-                <div className="flex items-center gap-2">
-                  <div className="grid size-8 place-items-center rounded-full bg-slate-100 text-slate-500">
-                    <UserRound size={16} />
+          {/* Reviews List */}
+          <div className="mt-6 space-y-4">
+            {reviews.length === 0 ? (
+              <p className="text-center text-sm text-slate-500 py-4">Hozircha sharhlar yo'q. Birinchi bo'lib baholang!</p>
+            ) : (
+              reviews.map(review => (
+                <div key={review.id} className="border-b border-slate-100 pb-4 last:border-0 last:pb-0">
+                  <div className="flex items-center gap-2">
+                    <div className="grid size-8 place-items-center rounded-full bg-slate-100 text-slate-500">
+                      <UserRound size={16} />
+                    </div>
+                    <div>
+                      <p className="text-sm font-bold text-slate-800">{review.userName}</p>
+                      <p className="text-xs text-slate-400">{review.date}</p>
+                    </div>
+                    <div className="ml-auto flex gap-0.5">
+                      {[1, 2, 3, 4, 5].map((star) => (
+                        <Star 
+                          key={star} 
+                          size={14} 
+                          fill={star <= review.rating ? "#fbbf24" : "none"} 
+                          color={star <= review.rating ? "#fbbf24" : "#cbd5e1"} 
+                        />
+                      ))}
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-sm font-bold text-slate-800">{review.userName}</p>
-                    <p className="text-xs text-slate-400">{review.date}</p>
-                  </div>
-                  <div className="ml-auto flex gap-0.5">
-                    {[1, 2, 3, 4, 5].map((star) => (
-                      <Star 
-                        key={star} 
-                        size={14} 
-                        fill={star <= review.rating ? "#fbbf24" : "none"} 
-                        color={star <= review.rating ? "#fbbf24" : "#cbd5e1"} 
-                      />
-                    ))}
-                  </div>
+                  {review.comment && (
+                    <p className="mt-2 text-sm text-slate-600 leading-relaxed ml-10">
+                      {review.comment}
+                    </p>
+                  )}
                 </div>
-                {review.comment && (
-                  <p className="mt-2 text-sm text-slate-600 leading-relaxed ml-10">
-                    {review.comment}
-                  </p>
-                )}
-              </div>
-            ))
-          )}
-        </div>
+              ))
+            )}
+          </div>
+        </section>
       </section>
 
       {/* Bottom Bar */}
