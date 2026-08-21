@@ -416,32 +416,49 @@ async def handle_my_orders(message: Message):
         e    = STATUS_EMOJI.get(st, "🟡")
         tstr = db.format_price(tot) if isinstance(tot, (int, float)) else str(tot)
 
-        products = o.get("products", [])
-        names = ", ".join([p.get("product", p).get("name", "—") for p in products])
-        if len(names) > 30: names = names[:27] + "..."
+        date_str = o.get("date", "—")
         
-        text += f"📦 <b>{names}</b>\n"
-        text += f"   🆔 ID: {oid} — {tstr}\n"
-        text += f"   {e} {st}\n"
-
+        text += f"🧾 <b>Buyurtma:</b> {oid}\n"
+        if date_str != "—": text += f"📅 <b>Sana:</b> {date_str}\n"
+        text += f"📊 <b>Holat:</b> {e} {st}\n"
+        
         if pm == "Karta":
             if ps == "Tolangan":
-                text += "   ✅ To'lov tasdiqlangan\n"
+                text += "💳 <b>To'lov turi:</b> Karta (✅ Tasdiqlangan)\n"
             elif ps == "Rad etildi":
-                text += "   ❌ Chek rad etildi\n"
+                text += "💳 <b>To'lov turi:</b> Karta (❌ Rad etilgan)\n"
                 btns.append([InlineKeyboardButton(
                     text=f"💳 {oid} — qayta chek",
                     callback_data=f"receipt:{oid}"
                 )])
             else:
-                text += "   ⏳ Chek kutilmoqda\n"
+                text += "💳 <b>To'lov turi:</b> Karta (⏳ Chek kutilmoqda)\n"
                 btns.append([InlineKeyboardButton(
                     text=f"💳 {oid} — chek yuborish",
                     callback_data=f"receipt:{oid}"
                 )])
         else:
-            text += "   💵 Naqd (yetkazganda)\n"
-        text += "\n"
+            text += "💳 <b>To'lov turi:</b> 💵 Naqd (yetkazganda)\n"
+
+        text += "\n🛍 <b>Mahsulotlar:</b>\n"
+        
+        products = o.get("products", [])
+        for idx, p in enumerate(products, 1):
+            qty   = p.get("quantity", 1)
+            size  = p.get("size")
+            color = p.get("color")
+            prod  = p.get("product") or p
+            name  = prod.get("name", "—")
+            
+            variant = []
+            if size: variant.append(f"O'lcham: {size}")
+            if color: variant.append(f"Rang: {color}")
+            v_text = f" ({', '.join(variant)})" if variant else ""
+            
+            text += f"  {idx}. {name}{v_text} — <b>{qty} ta</b>\n"
+            
+        text += f"\n💰 <b>Jami summa:</b> {tstr}\n"
+        text += "━━━━━━━━━━━━━━━━━━━━━━\n\n"
 
     kb = InlineKeyboardMarkup(inline_keyboard=btns) if btns else None
     await message.answer(text, reply_markup=kb)
