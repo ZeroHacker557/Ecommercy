@@ -81,8 +81,32 @@ export function getTelegram(): TelegramWebApp | null {
 // Get current user info
 export function getTelegramUser() {
   const tg = getTelegram()
-  if (!tg) return null
-  return tg.initDataUnsafe.user ?? null
+  
+  // If running inside Telegram, use real user data
+  if (tg && tg.initDataUnsafe && tg.initDataUnsafe.user) {
+    return tg.initDataUnsafe.user
+  }
+  
+  // Fallback for browser testing
+  try {
+    let mockUserStr = localStorage.getItem('mockTelegramUser')
+    if (mockUserStr) {
+      return JSON.parse(mockUserStr)
+    }
+    
+    // Generate a random mock user for browser testing
+    const randomId = Math.floor(Math.random() * 1000000)
+    const newMockUser = {
+      id: randomId,
+      first_name: "Test",
+      last_name: "Foydalanuvchi",
+      username: `testuser_${randomId}`
+    }
+    localStorage.setItem('mockTelegramUser', JSON.stringify(newMockUser))
+    return newMockUser
+  } catch (e) {
+    return null
+  }
 }
 
 // Initialize Telegram WebApp
