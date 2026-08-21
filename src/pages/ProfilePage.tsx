@@ -4,7 +4,7 @@ import { formatPrice } from '../data'
 import { IconButton } from '../components/ui/IconButton'
 import { OrderImages } from '../components/order/OrderImages'
 import { getTelegramUser } from '../utils/telegram'
-import type { AppPage, Order } from '../types/domain'
+import type { AppPage, Order, UserProfile } from '../types/domain'
 
 const profileOptions: [LucideIcon, string, string][] = [
   [UserRound, 'Shaxsiy ma\'lumotlar', 'Ismingiz va raqamingiz'],
@@ -16,14 +16,18 @@ const profileOptions: [LucideIcon, string, string][] = [
 ]
 
 type Props = {
+  profile: UserProfile | null
   orders: Order[]
   onNavigate: (page: AppPage) => void
   onNotify: (msg: string) => void
 }
 
-export function ProfilePage({ orders, onNavigate, onNotify }: Props) {
+export function ProfilePage({ profile, orders, onNavigate, onNotify }: Props) {
   const tgUser = getTelegramUser()
-  const userName = tgUser ? `${tgUser.first_name}${tgUser.last_name ? ' ' + tgUser.last_name : ''}` : 'Foydalanuvchi'
+  const userName = profile?.first_name 
+    ? `${profile.first_name}${profile.last_name ? ' ' + profile.last_name : ''}` 
+    : tgUser ? `${tgUser.first_name}${tgUser.last_name ? ' ' + tgUser.last_name : ''}` : 'Foydalanuvchi'
+  const userPhone = profile?.phone || (tgUser?.username ? `@${tgUser.username}` : 'Telegram orqali ulangan')
   const lastOrder = orders[0]
 
   return (
@@ -43,8 +47,9 @@ export function ProfilePage({ orders, onNavigate, onNotify }: Props) {
 
       {/* Profile Card */}
       <section
-        className="mx-5 mt-8 flex items-center gap-5 rounded-[28px] p-6 sm:mx-10"
+        className="mx-5 mt-8 flex items-center gap-5 rounded-[28px] p-6 sm:mx-10 cursor-pointer transition active:scale-[0.98]"
         style={{ background: 'linear-gradient(135deg, #f5f0ff, #fbf9ff)', animation: 'fadeInUp 0.5s ease' }}
+        onClick={() => onNavigate('profile_edit')}
       >
         <div className="grid size-20 place-items-center rounded-full overflow-hidden" style={{ background: '#ede9fe', color: '#7c3aed' }}>
           {tgUser?.photo_url ? (
@@ -56,7 +61,7 @@ export function ProfilePage({ orders, onNavigate, onNotify }: Props) {
         <div className="min-w-0 flex-1">
           <h2 className="truncate text-xl font-extrabold sm:text-2xl" style={{ color: '#111426' }}>{userName}</h2>
           <p className="mt-1 text-sm" style={{ color: '#64748b' }}>
-            {tgUser?.username ? `@${tgUser.username}` : 'Telegram orqali ulangan'}
+            {userPhone}
           </p>
         </div>
         <ChevronRight style={{ color: '#94a3b8' }} />
@@ -113,6 +118,8 @@ export function ProfilePage({ orders, onNavigate, onNotify }: Props) {
               key={label}
               onClick={() => {
                 if (label.includes('Buyurtmalar')) onNavigate('orders')
+                else if (label.includes('Shaxsiy')) onNavigate('profile_edit')
+                else if (label.includes('manzillarim')) onNavigate('addresses')
                 else onNotify(`${label} — tez orada!`)
               }}
               className={'profile-option ' + (index === profileOptions.length - 1 ? 'border-0' : '')}

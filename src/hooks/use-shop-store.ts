@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { formatPrice } from '../data'
-import { subscribeToCategories, subscribeToProducts, sendOrderToFirestore, saveUserToFirestore, subscribeToUserOrders } from '../lib/firebase'
-import type { AppPage, Category, Order, OrderForm, Product } from '../types/domain'
+import { subscribeToCategories, subscribeToProducts, sendOrderToFirestore, saveUserToFirestore, subscribeToUserOrders, subscribeToUserProfile } from '../lib/firebase'
+import type { AppPage, Category, Order, OrderForm, Product, UserProfile } from '../types/domain'
 import { hapticFeedback, hapticSuccess, initTelegram, getTelegramUser } from '../utils/telegram'
 
 const ORDERS_KEY = 'shopOnlineOrders'
@@ -44,6 +44,7 @@ export function useShopStore() {
   const [orderForm, setOrderForm] = useState<OrderForm>({
     name: '', phone: '', address: '', location: null, comment: '', paymentMethod: 'Naqd',
   })
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null)
 
   // Initialize Telegram & Firebase real-time subscriptions
   useEffect(() => {
@@ -75,11 +76,15 @@ export function useShopStore() {
       () => {}
     )
 
-    // 3. Subscribe to User Orders
+    // 3. Subscribe to User Orders & Profile
     let unsubOrders: (() => void) | undefined
+    let unsubProfile: (() => void) | undefined
     if (tgUser) {
       unsubOrders = subscribeToUserOrders(tgUser.id, (orders) => {
         setMyOrders(orders)
+      })
+      unsubProfile = subscribeToUserProfile(tgUser.id, (profile) => {
+        if (profile) setUserProfile(profile as UserProfile)
       })
     }
 
@@ -87,6 +92,7 @@ export function useShopStore() {
       unsubProds()
       unsubCats()
       if (unsubOrders) unsubOrders()
+      if (unsubProfile) unsubProfile()
     }
   }, [])
 
@@ -227,7 +233,7 @@ export function useShopStore() {
     cartItems, cartCount, cartTotal, cartProducts,
     likedIds, selectedProduct,
     isSearchOpen, isCartOpen, query, searchResults, toast,
-    myOrders, checkoutDone, orderForm,
+    myOrders, checkoutDone, orderForm, userProfile,
     navigate, openProduct, toggleLike,
     setSearchOpen, setQuery,
     addToCart, updateCartQuantity,

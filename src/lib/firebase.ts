@@ -1,5 +1,5 @@
 import { initializeApp } from 'firebase/app'
-import { getFirestore, collection, addDoc, onSnapshot, query, where, orderBy } from 'firebase/firestore'
+import { getFirestore, collection, addDoc, onSnapshot, query, where, doc, setDoc, updateDoc } from 'firebase/firestore'
 import { getStorage } from 'firebase/storage'
 import type { Product, Category, Order } from '../types/domain'
 
@@ -105,14 +105,35 @@ export async function sendOrderToFirestore(order: Order) {
 export async function saveUserToFirestore(user: { id: number; first_name: string; last_name?: string; username?: string; photo_url?: string }) {
   try {
     const usersRef = collection(db, 'users')
-    // We can use the user's ID as the document ID for easier retrieval
-    const { doc, setDoc } = await import('firebase/firestore')
     await setDoc(doc(usersRef, String(user.id)), {
       ...user,
       lastActive: new Date().toISOString()
     }, { merge: true })
   } catch (error) {
     console.error("Error saving user to Firestore:", error)
+  }
+}
+
+export function subscribeToUserProfile(userId: number, callback: (profile: any) => void) {
+  const userRef = doc(db, 'users', String(userId))
+  
+  return onSnapshot(userRef, (snapshot: any) => {
+    if (snapshot.exists()) {
+      callback(snapshot.data())
+    } else {
+      callback(null)
+    }
+  }, (error: any) => {
+    console.error("Error fetching user profile:", error)
+  })
+}
+
+export async function updateUserProfile(userId: number, data: any) {
+  try {
+    const userRef = doc(db, 'users', String(userId))
+    await updateDoc(userRef, data)
+  } catch (error) {
+    console.error("Error updating user profile:", error)
   }
 }
 

@@ -11,7 +11,8 @@ import { HomePage } from './pages/HomePage'
 import { OrdersPage } from './pages/OrdersPage'
 import { ProductDetailPage } from './pages/ProductDetailPage'
 import { ProfilePage } from './pages/ProfilePage'
-
+import { AddressesPage } from './pages/AddressesPage'
+import { ProfileEditPage } from './pages/ProfileEditPage'
 function App() {
   const shop = useShopStore()
   const productActions = {
@@ -105,6 +106,7 @@ function App() {
           {shop.page === 'profile' && (
             <div className="page-animate">
               <ProfilePage
+                profile={shop.userProfile}
                 orders={shop.myOrders}
                 onNavigate={shop.navigate}
                 onNotify={shop.notify}
@@ -127,19 +129,39 @@ function App() {
           {shop.page === 'checkout' && (
             <div className="page-animate">
               <CheckoutPage
+                profile={shop.userProfile}
                 cartProducts={shop.cartProducts}
                 cartTotal={shop.cartTotal}
                 orderForm={shop.orderForm}
                 onUpdateForm={shop.updateOrderForm}
                 onSubmit={shop.submitOrder}
                 onBack={() => shop.navigate('catalog')}
+                onNavigate={shop.navigate}
+              />
+            </div>
+          )}
+          {shop.page === 'addresses' && (
+            <div className="page-animate">
+              <AddressesPage
+                profile={shop.userProfile}
+                onNavigate={shop.navigate}
+                onNotify={shop.notify}
+              />
+            </div>
+          )}
+          {shop.page === 'profile_edit' && (
+            <div className="page-animate">
+              <ProfileEditPage
+                profile={shop.userProfile}
+                onNavigate={shop.navigate}
+                onNotify={shop.notify}
               />
             </div>
           )}
         </div>
 
         {/* Bottom Navigation */}
-        {!['detail', 'checkout'].includes(shop.page) && (
+        {!['detail', 'checkout', 'addresses', 'profile_edit'].includes(shop.page) && (
           <BottomNav page={shop.page} onNavigate={shop.navigate} cartCount={shop.cartCount} />
         )}
       </div>

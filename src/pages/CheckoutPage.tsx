@@ -1,6 +1,5 @@
 import { useState } from 'react'
-import { ArrowLeft, Copy, Check, MapPin, MessageSquare, Phone, Send, ShoppingBag, User, Navigation, CreditCard, Banknote } from 'lucide-react'
-import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet'
+import { ArrowLeft, Copy, Check, MapPin, MessageSquare, Phone, Send, ShoppingBag, User, CreditCard, Banknote } from 'lucide-react'
 import { formatPrice } from '../data'
 import { getImageUrl, hapticFeedback } from '../utils/telegram'
 import type { OrderForm, Product } from '../types/domain'
@@ -18,64 +17,27 @@ let DefaultIcon = L.icon({
 L.Marker.prototype.options.icon = DefaultIcon
 
 type Props = {
+  profile: import('../types/domain').UserProfile | null
   cartProducts: { product: Product; quantity: number; size?: string; color?: string; cartKey: string }[]
   cartTotal: number
   orderForm: OrderForm
   onUpdateForm: (field: keyof OrderForm, value: any) => void
   onSubmit: () => Promise<boolean>
   onBack: () => void
+  onNavigate: (page: import('../types/domain').AppPage) => void
 }
 
-function LocationPicker({ location, onChange }: { location: { lat: number; lng: number } | null, onChange: (loc: { lat: number; lng: number }) => void }) {
-  const [mapCenter] = useState<{ lat: number; lng: number }>(location || { lat: 41.2995, lng: 69.2401 }) // Default: Tashkent
-
-  const MapEvents = () => {
-    useMapEvents({
-      click(e) {
-        onChange(e.latlng)
-        hapticFeedback('light')
-      },
-    })
-    return null
-  }
-
-  const handleCurrentLocation = () => {
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          onChange({ lat: pos.coords.latitude, lng: pos.coords.longitude })
-          hapticFeedback('medium')
-        },
-        () => alert("Lokatsiyani aniqlab bo'lmadi")
-      )
-    }
-  }
-
-  return (
-    <div className="relative mt-2 h-[240px] w-full overflow-hidden rounded-2xl border" style={{ borderColor: '#e2e8f0' }}>
-      <MapContainer center={mapCenter} zoom={12} style={{ height: '100%', width: '100%', zIndex: 1 }}>
-        <TileLayer
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-        />
-        {location && <Marker position={location} />}
-        <MapEvents />
-      </MapContainer>
-      
-      <button 
-        type="button"
-        onClick={handleCurrentLocation}
-        className="absolute bottom-4 right-4 z-[400] grid size-10 place-items-center rounded-xl bg-white shadow-md transition hover:scale-105 active:scale-95"
-        style={{ color: '#7c3aed' }}
-      >
-        <Navigation size={20} />
-      </button>
-    </div>
-  )
-}
-
-export function CheckoutPage({ cartProducts, cartTotal, orderForm, onUpdateForm, onSubmit, onBack }: Props) {
+export function CheckoutPage({ profile, cartProducts, cartTotal, orderForm, onUpdateForm, onSubmit, onBack, onNavigate }: Props) {
   const [copied, setCopied] = useState(false)
+  const addresses = profile?.addresses || []
+
+  // Avtomatik to'ldirish
+  if (!orderForm.name && profile?.first_name) {
+    onUpdateForm('name', profile.first_name + (profile.last_name ? ' ' + profile.last_name : ''))
+  }
+  if (!orderForm.phone && profile?.phone) {
+    onUpdateForm('phone', profile.phone)
+  }
 
   const handleCopy = (text: string) => {
     navigator.clipboard.writeText(text).then(() => {
@@ -180,33 +142,59 @@ export function CheckoutPage({ cartProducts, cartTotal, orderForm, onUpdateForm,
               </div>
             </div>
 
-            {/* Address */}
+            {/* Address Selector */}
             <div>
               <label className="mb-1.5 block text-sm font-bold" style={{ color: '#334155' }}>
-                Manzil <span style={{ color: '#ef4444' }}>*</span>
+                Yetkazish manzili <span style={{ color: '#ef4444' }}>*</span>
               </label>
-              <div className="flex items-center gap-3 rounded-2xl border px-4 py-3 transition-all focus-within:border-violet-300 focus-within:shadow-md focus-within:shadow-violet-100" style={{ borderColor: '#e2e8f0', background: '#fafafa' }}>
-                <MapPin size={20} style={{ color: '#94a3b8' }} className="shrink-0" />
-                <input
-                  value={orderForm.address}
-                  onChange={(e) => onUpdateForm('address', e.target.value)}
-                  placeholder="Toshkent shahar, Yunusobod tumani..."
-                  className="h-6 w-full bg-transparent text-sm outline-none"
-                  style={{ color: '#111426' }}
-                />
-              </div>
-            </div>
-
-            {/* Map Location */}
-            <div>
-              <label className="mb-1.5 block text-sm font-bold" style={{ color: '#334155' }}>
-                Xaritadan tanlash (ixtiyoriy)
-              </label>
-              <p className="text-xs mb-2" style={{ color: '#64748b' }}>Yetkazib berishni osonlashtirish uchun xaritadan joyni belgilang</p>
-              <LocationPicker 
-                location={orderForm.location || null} 
-                onChange={(loc) => onUpdateForm('location', loc)} 
-              />
+              
+              {addresses.length === 0 ? (
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-center">
+                  <p className="mb-3 text-sm text-slate-500">Sizda hali saqlangan manzillar yo'q</p>
+                  <button 
+                    onClick={() => onNavigate('addresses')}
+                    className="rounded-xl border border-purple-200 bg-purple-50 px-4 py-2 text-sm font-bold text-purple-600 transition hover:bg-purple-100"
+                  >
+                    + Yangi manzil qo'shish
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {addresses.map(addr => {
+                    const isSelected = orderForm.address === addr.address
+                    return (
+                      <div 
+                        key={addr.id}
+                        onClick={() => {
+                          onUpdateForm('address', addr.address)
+                          onUpdateForm('location', addr.location)
+                          hapticFeedback('light')
+                        }}
+                        className={`flex cursor-pointer items-center gap-3 rounded-2xl border p-3 transition-all ${
+                          isSelected 
+                            ? 'border-purple-500 bg-purple-50 shadow-sm' 
+                            : 'border-slate-200 bg-white hover:border-purple-300'
+                        }`}
+                      >
+                        <div className={`grid size-10 shrink-0 place-items-center rounded-full ${isSelected ? 'bg-purple-100 text-purple-600' : 'bg-slate-100 text-slate-400'}`}>
+                          <MapPin size={20} />
+                        </div>
+                        <div className="flex-1">
+                          <p className={`font-bold ${isSelected ? 'text-purple-700' : 'text-slate-700'}`}>{addr.name}</p>
+                          <p className="text-xs text-slate-500 truncate">{addr.address}</p>
+                        </div>
+                        {isSelected && <Check size={20} className="text-purple-600" />}
+                      </div>
+                    )
+                  })}
+                  <button 
+                    onClick={() => onNavigate('addresses')}
+                    className="mt-2 w-full rounded-xl border border-dashed border-slate-300 py-3 text-sm font-bold text-slate-500 transition hover:bg-slate-50"
+                  >
+                    + Boshqa manzil qo'shish
+                  </button>
+                </div>
+              )}
             </div>
 
             {/* Comment */}

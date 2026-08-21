@@ -1,4 +1,4 @@
-export type AppPage = 'home' | 'catalog' | 'favorites' | 'orders' | 'profile' | 'detail' | 'checkout'
+export type AppPage = 'home' | 'catalog' | 'favorites' | 'orders' | 'profile' | 'detail' | 'checkout' | 'addresses' | 'profile_edit'
 
 export type Product = {
   id: number
@@ -57,4 +57,20 @@ export type ProductActions = {
 export type CartItem = {
   productId: number
   quantity: number
+}
+
+export type Address = {
+  id: string
+  name: string
+  address: string
+  location: { lat: number; lng: number }
+}
+
+export type UserProfile = {
+  id: number
+  first_name: string
+  last_name?: string
+  username?: string
+  phone?: string
+  addresses: Address[]
 }
