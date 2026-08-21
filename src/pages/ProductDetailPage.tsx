@@ -79,7 +79,7 @@ export function ProductDetailPage({ product, onAddToCart, onBack, likedIds, onTo
   return (
     <>
       {/* Header */}
-      <header className="flex items-center justify-between px-5 pt-8 sm:px-10">
+      <header className="flex items-center justify-between px-5 pt-8 sm:px-10 page-animate">
         <button onClick={onBack} className="grid size-11 place-items-center rounded-2xl transition hover:bg-violet-50 active:scale-90" style={{ color: '#111426' }}>
           <ArrowLeft size={24} />
         </button>
@@ -116,7 +116,7 @@ export function ProductDetailPage({ product, onAddToCart, onBack, likedIds, onTo
       </section>
 
       {/* Info */}
-      <section className="mx-5 mt-5 rounded-t-[28px] border-t border-slate-100 pb-40 pt-7 sm:mx-10">
+      <section className="mx-5 mt-5 rounded-t-[28px] border-t border-slate-100 pb-40 pt-7 sm:mx-10 page-animate">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <span className="font-bold" style={{ color: '#7c3aed' }}>
             {product.category}

@@ -115,31 +115,27 @@ function App() {
             </div>
           )}
           {shop.page === 'detail' && shop.selectedProduct && (
-            <div className="page-animate">
-                  <ProductDetailPage
-                product={shop.selectedProduct}
-                onAddToCart={(product, size, color) => shop.addToCart(product, size, color)}
-                onBack={() => shop.navigate('catalog')}
-                likedIds={shop.likedIds}
-                onToggleLike={shop.toggleLike}
-                onOpenCart={shop.openCart}
-                cartCount={shop.cartCount}
-              />
-            </div>
+            <ProductDetailPage
+              product={shop.selectedProduct}
+              onAddToCart={(product, size, color) => shop.addToCart(product, size, color)}
+              onBack={() => shop.navigate('catalog')}
+              likedIds={shop.likedIds}
+              onToggleLike={shop.toggleLike}
+              onOpenCart={shop.openCart}
+              cartCount={shop.cartCount}
+            />
           )}
           {shop.page === 'checkout' && (
-            <div className="page-animate">
-              <CheckoutPage
-                profile={shop.userProfile}
-                cartProducts={shop.cartProducts}
-                cartTotal={shop.cartTotal}
-                orderForm={shop.orderForm}
-                onUpdateForm={shop.updateOrderForm}
-                onSubmit={shop.submitOrder}
-                onBack={() => shop.navigate('catalog')}
-                onNavigate={shop.navigate}
-              />
-            </div>
+            <CheckoutPage
+              profile={shop.userProfile}
+              cartProducts={shop.cartProducts}
+              cartTotal={shop.cartTotal}
+              orderForm={shop.orderForm}
+              onUpdateForm={shop.updateOrderForm}
+              onSubmit={shop.submitOrder}
+              onBack={() => shop.navigate('catalog')}
+              onNavigate={shop.navigate}
+            />
           )}
           {shop.page === 'addresses' && (
             <div className="page-animate">

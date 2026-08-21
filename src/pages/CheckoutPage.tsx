@@ -55,7 +55,7 @@ export function CheckoutPage({ profile, cartProducts, cartTotal, orderForm, onUp
   return (
     <>
       {/* Header */}
-      <header className="flex items-center gap-3 px-5 pt-8 sm:px-10">
+      <header className="flex items-center gap-3 px-5 pt-8 sm:px-10 page-animate">
         <button
           onClick={onBack}
           className="grid size-11 place-items-center rounded-2xl transition hover:bg-violet-50 active:scale-90"
@@ -66,7 +66,7 @@ export function CheckoutPage({ profile, cartProducts, cartTotal, orderForm, onUp
         <h1 className="text-2xl font-extrabold" style={{ color: '#111426' }}>Buyurtma berish</h1>
       </header>
 
-      <div className="px-5 pb-10 pt-6 sm:px-10">
+      <div className="px-5 pb-10 pt-6 sm:px-10 page-animate">
         {/* Order Summary */}
         <section
           className="rounded-2xl border p-4"
