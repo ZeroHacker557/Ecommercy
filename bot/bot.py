@@ -416,7 +416,12 @@ async def handle_my_orders(message: Message):
         e    = STATUS_EMOJI.get(st, "🟡")
         tstr = db.format_price(tot) if isinstance(tot, (int, float)) else str(tot)
 
-        text += f"🆔 <b>{oid}</b> — {tstr}\n"
+        products = o.get("products", [])
+        names = ", ".join([p.get("product", p).get("name", "—") for p in products])
+        if len(names) > 30: names = names[:27] + "..."
+        
+        text += f"📦 <b>{names}</b>\n"
+        text += f"   🆔 ID: {oid} — {tstr}\n"
         text += f"   {e} {st}\n"
 
         if pm == "Karta":
@@ -466,7 +471,7 @@ async def cmd_start(message: Message, state: FSMContext):
 
             u_text  = "💳 <b>To'lov ma'lumotlari</b>\n"
             u_text += "━" * 22 + "\n\n"
-            u_text += f"🆔 Buyurtma: <b>{order_id}</b>\n"
+            u_text += f"🆔 Buyurtma ID: <b>{order_id}</b>\n"
             u_text += "📦 <b>Mahsulotlar:</b>\n"
             for p in products:
                 qty   = p.get("quantity", 1)

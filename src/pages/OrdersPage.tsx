@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { ChevronDown, ChevronRight, ExternalLink, ShoppingBag, SlidersHorizontal } from 'lucide-react'
 import { formatPrice } from '../data'
+import { getImageUrl } from '../utils/telegram'
 import { PageHeader } from '../components/layout/PageHeader'
 import { OrderImages } from '../components/order/OrderImages'
 import { openBotDeepLink } from '../utils/telegram'
@@ -90,33 +91,54 @@ export function OrdersPage({ orders, cartCount, onSearch, onOpenCart }: Props) {
           const payInfo = getPayInfo(order)
           return (
             <div key={order.id} className="order-card flex-col gap-3" style={{ animationDelay: `${i * 0.08}s` }}>
-              {/* Header row */}
-              <div className="flex items-start justify-between gap-3">
-                <div className="flex-1 min-w-0">
-                  <h3 className="font-extrabold" style={{ color: '#111426' }}>{order.id}</h3>
-                  <p className="mt-0.5 text-sm" style={{ color: '#64748b' }}>{order.date}</p>
-                  <div className="mt-3">
-                    <OrderImages products={order.products} />
-                    <p className="mt-2 text-sm" style={{ color: '#64748b' }}>{order.products.length} ta mahsulot</p>
+              <div className="flex flex-col gap-3">
+                {/* Header row */}
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex-1 min-w-0">
+                    <h3 className="font-extrabold truncate text-base" style={{ color: '#111426' }}>
+                      {order.products.map(p => p.product.name).join(', ')}
+                    </h3>
+                    <p className="mt-1 text-xs font-bold" style={{ color: '#64748b' }}>Buyurtma ID: {order.id}</p>
+                    <p className="mt-0.5 text-xs" style={{ color: '#94a3b8' }}>{order.date}</p>
+                  </div>
+
+                  <div className="flex flex-col items-end text-right shrink-0">
+                    <p className="text-lg font-extrabold sm:text-xl" style={{ color: '#111426' }}>
+                      {formatPrice(order.total)}
+                    </p>
+                    <p className="mt-1 text-sm font-semibold" style={{ color: getStatusColor(order.status) }}>
+                      {order.status}
+                    </p>
+                    {payInfo && !payInfo.needsAction && (
+                      <span
+                        className="mt-1 rounded-full px-2 py-0.5 text-[10px] font-semibold"
+                        style={{ background: payInfo.bg, color: payInfo.color }}
+                      >
+                        {payInfo.label}
+                      </span>
+                    )}
                   </div>
                 </div>
 
-                <div className="flex flex-col items-end text-right shrink-0">
-                  <p className="text-lg font-extrabold sm:text-xl" style={{ color: '#111426' }}>
-                    {formatPrice(order.total)}
-                  </p>
-                  <p className="mt-1 text-sm font-semibold" style={{ color: getStatusColor(order.status) }}>
-                    {order.status}
-                  </p>
-                  {payInfo && !payInfo.needsAction && (
-                    <span
-                      className="mt-1 rounded-full px-2 py-0.5 text-xs font-semibold"
-                      style={{ background: payInfo.bg, color: payInfo.color }}
-                    >
-                      {payInfo.label}
-                    </span>
-                  )}
-                  <ChevronRight className="mt-auto" style={{ color: '#7c3aed' }} />
+                {/* Products List */}
+                <div className="mt-2 space-y-2 border-t border-slate-100 pt-3">
+                  {order.products.map((item, idx) => (
+                    <div key={idx} className="flex gap-3 items-center">
+                      <img
+                        src={item.product.images?.[0] ? getImageUrl(item.product.images[0]) : ''}
+                        alt={item.product.name}
+                        className="size-12 rounded-lg border border-slate-100 object-contain p-1"
+                      />
+                      <div className="text-sm min-w-0">
+                        <p className="font-bold truncate" style={{ color: '#111426' }}>{item.product.name}</p>
+                        <p className="text-[11px] font-medium" style={{ color: '#64748b' }}>
+                          {item.quantity} ta
+                          {item.size && ` | O'lcham: ${item.size}`}
+                          {item.color && ` | Rang: ${item.color}`}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
 

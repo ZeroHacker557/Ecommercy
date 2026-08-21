@@ -86,14 +86,19 @@ export function ProfilePage({ orders, onNavigate, onNotify }: Props) {
             </button>
           </div>
           <button onClick={() => onNavigate('orders')} className="order-card w-full text-left">
-            <div>
-              <OrderImages products={lastOrder.products} />
-              <p className="mt-3 text-sm" style={{ color: '#64748b' }}>{lastOrder.products.length} ta mahsulot</p>
+            <div className="min-w-0 flex-1">
+              <h3 className="font-extrabold truncate text-base" style={{ color: '#111426' }}>
+                {lastOrder.products.map(p => p.product.name).join(', ')}
+              </h3>
+              <p className="mt-1 text-xs font-bold" style={{ color: '#64748b' }}>ID: {lastOrder.id}</p>
+              <div className="mt-2">
+                <OrderImages products={lastOrder.products} />
+                <p className="mt-1 text-[11px]" style={{ color: '#64748b' }}>{lastOrder.products.length} ta mahsulot</p>
+              </div>
             </div>
-            <div className="text-right">
-              <b style={{ color: '#111426' }}>{lastOrder.id}</b>
-              <p className="mt-2 text-sm" style={{ color: '#64748b' }}>{lastOrder.date}</p>
-              <strong className="mt-3 block text-lg" style={{ color: '#111426' }}>{formatPrice(lastOrder.total)}</strong>
+            <div className="text-right shrink-0">
+              <strong className="block text-lg" style={{ color: '#111426' }}>{formatPrice(lastOrder.total)}</strong>
+              <p className="mt-1 text-xs" style={{ color: '#94a3b8' }}>{lastOrder.date}</p>
             </div>
           </button>
         </section>
