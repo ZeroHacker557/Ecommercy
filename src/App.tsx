@@ -70,6 +70,7 @@ function App() {
                 onSearch={() => shop.setSearchOpen(true)}
                 onNavigate={shop.navigate}
                 onOpenCart={shop.openCart}
+                onNotify={shop.notify}
               />
             </div>
           )}

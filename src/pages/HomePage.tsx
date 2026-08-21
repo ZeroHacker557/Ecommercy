@@ -35,9 +35,10 @@ type Props = ProductActions & {
   onNavigate: (page: AppPage) => void
   onOpenCart: () => void
   unreadNotificationsCount: number
+  onNotify: (message: string) => void
 }
 
-export function HomePage({ products, categories, loading, cartCount, onSearch, onNavigate, onOpenCart, unreadNotificationsCount, ...productActions }: Props) {
+export function HomePage({ products, categories, loading, cartCount, onSearch, onNavigate, onOpenCart, unreadNotificationsCount, onNotify, ...productActions }: Props) {
   const carouselItems = [...defaultCategories, ...defaultCategories]
 
   return (

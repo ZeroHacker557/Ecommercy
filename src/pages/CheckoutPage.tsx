@@ -128,7 +128,6 @@ export function CheckoutPage({ profile, cartProducts, cartTotal, orderForm, onUp
               </div>
             ))}
           </div>
-          <div className="mt-4 flex justify-between border-t pt-3" style={{ borderColor: '#f1f5f9' }}>
           <div className="mt-4 border-t pt-3" style={{ borderColor: '#f1f5f9' }}>
             {/* Promo Code Input */}
             <div className="mb-3 flex items-start gap-2">

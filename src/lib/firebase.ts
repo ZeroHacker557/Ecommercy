@@ -204,8 +204,7 @@ export function subscribeToUserReviews(userId: number, callback: (reviews: Revie
     // sort by newest
     reviews.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
     callback(reviews)
-  }, (error) => {
-  }, (error) => {
+  }, (error: any) => {
     console.error("Error fetching user reviews:", error)
   })
 }
@@ -220,9 +219,9 @@ export function subscribeToUserNotifications(userId: number, callback: (notifica
     where('userId', '==', userId)
   )
   return onSnapshot(q, (snapshot) => {
-    const notifs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))
+    const notifs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as any))
     // Sort in memory by date desc (if real string dates)
-    notifs.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+    notifs.sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime())
     callback(notifs)
   })
 }
