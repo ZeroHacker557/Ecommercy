@@ -13,6 +13,7 @@ import { ProductDetailPage } from './pages/ProductDetailPage'
 import { ProfilePage } from './pages/ProfilePage'
 import { AddressesPage } from './pages/AddressesPage'
 import { ProfileEditPage } from './pages/ProfileEditPage'
+import { ReviewsPage } from './pages/ReviewsPage'
 function App() {
   const shop = useShopStore()
   const productActions = {
@@ -158,10 +159,18 @@ function App() {
               />
             </div>
           )}
+          {shop.page === 'reviews' && (
+            <div className="page-animate">
+              <ReviewsPage
+                profile={shop.userProfile}
+                onNavigate={shop.navigate}
+              />
+            </div>
+          )}
         </div>
 
         {/* Bottom Navigation */}
-        {!['detail', 'checkout', 'addresses', 'profile_edit'].includes(shop.page) && (
+        {!['detail', 'checkout', 'addresses', 'profile_edit', 'reviews'].includes(shop.page) && (
           <BottomNav page={shop.page} onNavigate={shop.navigate} cartCount={shop.cartCount} />
         )}
       </div>

@@ -62,7 +62,7 @@ export function ProfileEditPage({ profile, onNavigate, onNotify }: Props) {
               type="text" 
               value={firstName} 
               onChange={e => setFirstName(e.target.value)}
-              className="w-full rounded-2xl border border-slate-200 bg-white p-4 font-bold text-slate-800 outline-none transition focus:border-purple-500 focus:ring-4 focus:ring-purple-500/10"
+              className="w-full rounded-2xl border-2 border-slate-200 bg-slate-50/50 p-4 font-bold text-slate-800 outline-none transition-all hover:border-slate-300 focus:border-purple-500 focus:bg-white focus:shadow-md focus:ring-4 focus:ring-purple-500/10"
               placeholder="Masalan: Alisher"
               required
             />
@@ -74,7 +74,7 @@ export function ProfileEditPage({ profile, onNavigate, onNotify }: Props) {
               type="text" 
               value={lastName} 
               onChange={e => setLastName(e.target.value)}
-              className="w-full rounded-2xl border border-slate-200 bg-white p-4 font-bold text-slate-800 outline-none transition focus:border-purple-500 focus:ring-4 focus:ring-purple-500/10"
+              className="w-full rounded-2xl border-2 border-slate-200 bg-slate-50/50 p-4 font-bold text-slate-800 outline-none transition-all hover:border-slate-300 focus:border-purple-500 focus:bg-white focus:shadow-md focus:ring-4 focus:ring-purple-500/10"
               placeholder="Masalan: Usmonov"
             />
           </div>
@@ -85,7 +85,7 @@ export function ProfileEditPage({ profile, onNavigate, onNotify }: Props) {
               type="tel" 
               value={phone} 
               onChange={e => setPhone(e.target.value)}
-              className="w-full rounded-2xl border border-slate-200 bg-white p-4 font-bold text-slate-800 outline-none transition focus:border-purple-500 focus:ring-4 focus:ring-purple-500/10"
+              className="w-full rounded-2xl border-2 border-slate-200 bg-slate-50/50 p-4 font-bold text-slate-800 outline-none transition-all hover:border-slate-300 focus:border-purple-500 focus:bg-white focus:shadow-md focus:ring-4 focus:ring-purple-500/10"
               placeholder="+998 90 123 45 67"
               required
             />

@@ -1,4 +1,4 @@
-export type AppPage = 'home' | 'catalog' | 'favorites' | 'orders' | 'profile' | 'detail' | 'checkout' | 'addresses' | 'profile_edit'
+export type AppPage = 'home' | 'catalog' | 'favorites' | 'orders' | 'profile' | 'detail' | 'checkout' | 'addresses' | 'profile_edit' | 'reviews'
 
 export type Product = {
   id: number
@@ -73,4 +73,14 @@ export type UserProfile = {
   username?: string
   phone?: string
   addresses: Address[]
+}
+
+export type Review = {
+  id: string
+  productId: number
+  userId: number
+  userName: string
+  rating: number // 1 to 5
+  comment: string
+  date: string
 }

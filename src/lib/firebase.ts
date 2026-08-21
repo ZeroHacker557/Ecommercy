@@ -161,3 +161,50 @@ export function subscribeToUserOrders(userId: number, callback: (orders: Order[]
     console.error("Error fetching user orders:", error)
   })
 }
+
+// ── REVIEWS ──────────────────────────────────────────────────
+import type { Review } from '../types/domain'
+
+export async function addReview(review: Omit<Review, 'id'>) {
+  try {
+    const reviewsRef = collection(db, 'reviews')
+    await addDoc(reviewsRef, review)
+  } catch (error) {
+    console.error("Error adding review:", error)
+    throw error
+  }
+}
+
+export function subscribeToProductReviews(productId: number, callback: (reviews: Review[]) => void) {
+  const reviewsRef = collection(db, 'reviews')
+  const q = query(reviewsRef, where('productId', '==', productId))
+  
+  return onSnapshot(q, (snapshot) => {
+    const reviews: Review[] = snapshot.docs.map(doc => ({
+      ...doc.data(),
+      id: doc.id
+    } as Review))
+    // sort by newest
+    reviews.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+    callback(reviews)
+  }, (error) => {
+    console.error("Error fetching product reviews:", error)
+  })
+}
+
+export function subscribeToUserReviews(userId: number, callback: (reviews: Review[]) => void) {
+  const reviewsRef = collection(db, 'reviews')
+  const q = query(reviewsRef, where('userId', '==', userId))
+  
+  return onSnapshot(q, (snapshot) => {
+    const reviews: Review[] = snapshot.docs.map(doc => ({
+      ...doc.data(),
+      id: doc.id
+    } as Review))
+    // sort by newest
+    reviews.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+    callback(reviews)
+  }, (error) => {
+    console.error("Error fetching user reviews:", error)
+  })
+}

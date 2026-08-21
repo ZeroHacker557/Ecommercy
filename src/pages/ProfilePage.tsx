@@ -120,6 +120,7 @@ export function ProfilePage({ profile, orders, onNavigate, onNotify }: Props) {
                 if (label.includes('Buyurtmalar')) onNavigate('orders')
                 else if (label.includes('Shaxsiy')) onNavigate('profile_edit')
                 else if (label.includes('manzillarim')) onNavigate('addresses')
+                else if (label.includes('Baholash')) onNavigate('reviews')
                 else onNotify(`${label} — tez orada!`)
               }}
               className={'profile-option ' + (index === profileOptions.length - 1 ? 'border-0' : '')}
