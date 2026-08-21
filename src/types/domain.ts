@@ -27,7 +27,7 @@ export type OrderStatus = 'Yangi' | 'Qabul qilindi' | 'Yetkazilmoqda' | 'Yetkazi
 export type Order = {
   id: string
   date: string
-  products: { product: Product; quantity: number }[]
+  products: { product: Product; quantity: number; size?: string; color?: string; cartKey?: string }[]
   total: number
   status: OrderStatus
   paymentMethod?: 'Naqd' | 'Karta'
@@ -48,7 +48,7 @@ export type OrderForm = {
 
 export type ProductActions = {
   onOpen: (product: Product) => void
-  onAddToCart: (product: Product) => void
+  onAddToCart: (product: Product, size?: string, color?: string) => void
   likedIds: number[]
   onToggleLike: (id: number) => void
 }

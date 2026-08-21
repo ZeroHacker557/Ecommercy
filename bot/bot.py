@@ -16,7 +16,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.client.default import DefaultBotProperties
 
-from config import BOT_TOKEN, ADMIN_ID, MINI_APP_URL, CARD_NUMBER, CARD_OWNER
+from config import BOT_TOKEN, ADMIN_IDS, MINI_APP_URL, CARD_NUMBER, CARD_OWNER
 from admin import router as admin_router
 import firebase_db as db
 
@@ -112,11 +112,19 @@ def get_products_text(products: list) -> str:
     lines = ""
     for i, p in enumerate(products, 1):
         qty      = p.get("quantity", 1)
+        size     = p.get("size")
+        color    = p.get("color")
         prod     = p.get("product") or p
         name     = prod.get("name", "—")
         price    = prod.get("price", 0)
         item_sum = db.format_price(price * qty)
-        lines += f"  <b>{i}. {name}</b>\n"
+        
+        variant_info = []
+        if size: variant_info.append(f"O'lcham: {size}")
+        if color: variant_info.append(f"Rang: {color}")
+        var_text = f" ({', '.join(variant_info)})" if variant_info else ""
+        
+        lines += f"  <b>{i}. {name}</b>{var_text}\n"
         lines += f"     └ {qty} ta × {db.format_price(price)} = <b>{item_sum}</b>\n"
     return lines
 
@@ -160,9 +168,13 @@ async def notify_admin_order(order_data: dict):
         if pay_method == "Karta":
             text += "\n💳 <b>To'lov:</b> ⏳ Chek kutilmoqda"
 
-        await bot.send_message(ADMIN_ID, text,
-                               reply_markup=order_action_kb(order_id),
-                               disable_web_page_preview=True)
+        for admin_id in ADMIN_IDS:
+            try:
+                await bot.send_message(admin_id, text,
+                                       reply_markup=order_action_kb(order_id),
+                                       disable_web_page_preview=True)
+            except Exception as e:
+                logger.warning(f"[ADMIN] {admin_id} ga yuborib bo'lmadi: {e}")
         logger.info(f"[ADMIN] Yuborildi: {order_id} | {pay_method}")
 
         # ── USER XABARI (faqat Karta) ─────────────────────────
@@ -202,7 +214,7 @@ async def notify_admin_order(order_data: dict):
 
 @dp.callback_query(F.data.startswith("os:"))
 async def cb_order_status(callback: CallbackQuery):
-    if callback.from_user.id != ADMIN_ID:
+    if callback.from_user.id not in ADMIN_IDS:
         return
 
     _, status, order_id = callback.data.split(":", 2)
@@ -272,10 +284,14 @@ async def handle_receipt_photo(message: Message, state: FSMContext):
     caption += "━" * 22
 
     try:
-        await bot.send_photo(ADMIN_ID,
-                             photo=message.photo[-1].file_id,
-                             caption=caption,
-                             reply_markup=payment_confirm_kb(order_id, user_id))
+        for admin_id in ADMIN_IDS:
+            try:
+                await bot.send_photo(admin_id,
+                                     photo=message.photo[-1].file_id,
+                                     caption=caption,
+                                     reply_markup=payment_confirm_kb(order_id, user_id))
+            except Exception as e:
+                logger.warning(f"[RECEIPT] Admin {admin_id} ga yuborib bo'lmadi: {e}")
         logger.info(f"[RECEIPT] Adminga yo'naltirildi: {order_id} ← {user_id}")
     except Exception as e:
         logger.error(f"[RECEIPT] Adminga yuborib bo'lmadi: {e}")
@@ -296,7 +312,7 @@ async def handle_receipt_wrong(message: Message):
 
 @dp.callback_query(F.data.startswith("pconf:"))
 async def cb_payment_confirm(callback: CallbackQuery):
-    if callback.from_user.id != ADMIN_ID:
+    if callback.from_user.id not in ADMIN_IDS:
         return
 
     parts    = callback.data.split(":")
@@ -326,12 +342,16 @@ async def cb_payment_confirm(callback: CallbackQuery):
         except Exception:
             pass
 
-        # Admin uchun status tugmalarini qayta yuborish
-        await bot.send_message(
-            ADMIN_ID,
-            f"📦 <b>{order_id}</b> — to'lov tasdiqlandi ✅\nBuyurtma statusini o'zgartiring:",
-            reply_markup=order_action_kb(order_id)
-        )
+        # Barcha adminlarga status tugmalarini yuborish
+        for admin_id in ADMIN_IDS:
+            try:
+                await bot.send_message(
+                    admin_id,
+                    f"📦 <b>{order_id}</b> — to'lov tasdiqlandi ✅\nBuyurtma statusini o'zgartiring:",
+                    reply_markup=order_action_kb(order_id)
+                )
+            except Exception:
+                pass
         await callback.answer("✅ Tasdiqlandi!", show_alert=True)
 
     elif action == "no":
@@ -356,12 +376,16 @@ async def cb_payment_confirm(callback: CallbackQuery):
         except Exception:
             pass
 
-        # Admin uchun status tugmalarini qayta yuborish
-        await bot.send_message(
-            ADMIN_ID,
-            f"📦 <b>{order_id}</b> — chek rad etildi ❌ (mijoz qayta yuboradi)\nBuyurtma statusini o'zgartiring:",
-            reply_markup=order_action_kb(order_id)
-        )
+        # Barcha adminlarga status tugmalarini yuborish
+        for admin_id in ADMIN_IDS:
+            try:
+                await bot.send_message(
+                    admin_id,
+                    f"📦 <b>{order_id}</b> — chek rad etildi ❌ (mijoz qayta yuboradi)\nBuyurtma statusini o'zgartiring:",
+                    reply_markup=order_action_kb(order_id)
+                )
+            except Exception:
+                pass
         await callback.answer("❌ Rad etildi!", show_alert=True)
 
 
@@ -423,7 +447,7 @@ async def handle_my_orders(message: Message):
 @dp.message(F.text.startswith("/start"))
 async def cmd_start(message: Message, state: FSMContext):
     user     = message.from_user
-    is_admin = user.id == ADMIN_ID
+    is_admin = user.id in ADMIN_IDS
 
     # ── Deep link: /start receipt_1234567 ──
     parts = message.text.split(" ", 1)
@@ -445,9 +469,18 @@ async def cmd_start(message: Message, state: FSMContext):
             u_text += f"🆔 Buyurtma: <b>{order_id}</b>\n"
             u_text += "📦 <b>Mahsulotlar:</b>\n"
             for p in products:
-                qty  = p.get("quantity", 1)
-                prod = p.get("product") or p
-                u_text += f"  • {prod.get('name', '—')} × {qty}\n"
+                qty   = p.get("quantity", 1)
+                size  = p.get("size")
+                color = p.get("color")
+                prod  = p.get("product") or p
+                name  = prod.get("name", "—")
+                
+                variant_info = []
+                if size: variant_info.append(f"O'lcham: {size}")
+                if color: variant_info.append(f"Rang: {color}")
+                var_text = f" ({', '.join(variant_info)})" if variant_info else ""
+                
+                u_text += f"  • {name}{var_text} × {qty}\n"
             u_text += f"\n💰 Jami: <b>{total_str}</b>\n"
             u_text += "━" * 22 + "\n\n"
             u_text += "💳 <b>Karta raqami:</b>\n"

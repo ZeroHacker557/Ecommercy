@@ -113,9 +113,9 @@ function App() {
           )}
           {shop.page === 'detail' && shop.selectedProduct && (
             <div className="page-animate">
-              <ProductDetailPage
+                  <ProductDetailPage
                 product={shop.selectedProduct}
-                onAddToCart={() => shop.addToCart(shop.selectedProduct!)}
+                onAddToCart={(product, size, color) => shop.addToCart(product, size, color)}
                 onBack={() => shop.navigate('catalog')}
                 likedIds={shop.likedIds}
                 onToggleLike={shop.toggleLike}

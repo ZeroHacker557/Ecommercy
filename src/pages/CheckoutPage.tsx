@@ -115,8 +115,8 @@ export function CheckoutPage({ cartProducts, cartTotal, orderForm, onUpdateForm,
             Buyurtma ({cartProducts.length} ta mahsulot)
           </h3>
           <div className="mt-3 space-y-3">
-            {cartProducts.map(({ product, quantity }) => (
-              <div key={product.id} className="flex items-center gap-3">
+            {cartProducts.map(({ product, quantity, size, color, cartKey }) => (
+              <div key={cartKey || product.id} className="flex items-center gap-3">
                 <img
                   src={product.images[0] ? getImageUrl(product.images[0]) : ''}
                   alt={product.name}
@@ -124,7 +124,12 @@ export function CheckoutPage({ cartProducts, cartTotal, orderForm, onUpdateForm,
                 />
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-bold" style={{ color: '#111426' }}>{product.name}</p>
-                  <p className="text-xs" style={{ color: '#64748b' }}>{quantity} × {formatPrice(product.price)}</p>
+                  {(size || color) && (
+                    <p className="mt-0.5 text-[11px] font-medium" style={{ color: '#64748b' }}>
+                      {size && size} {size && color && ' | '} {color && color}
+                    </p>
+                  )}
+                  <p className="mt-0.5 text-xs" style={{ color: '#64748b' }}>{quantity} × {formatPrice(product.price)}</p>
                 </div>
                 <b className="text-sm" style={{ color: '#111426' }}>{formatPrice(product.price * quantity)}</b>
               </div>

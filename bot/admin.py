@@ -11,7 +11,7 @@ from aiogram.types import (
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 
-from config import ADMIN_ID, IMAGES_DIR
+from config import ADMIN_IDS, IMAGES_DIR
 import firebase_db as db
 
 router = Router()
@@ -39,7 +39,7 @@ class AddProduct(StatesGroup):
 # ─── Helpers ─────────────────────────────────────────────────
 
 def is_admin(user_id: int) -> bool:
-    return user_id == ADMIN_ID
+    return user_id in ADMIN_IDS
 
 
 def admin_menu_kb():

@@ -4,10 +4,10 @@ import { getImageUrl } from '../../utils/telegram'
 import type { Product } from '../../types/domain'
 
 type Props = {
-  cartProducts: { product: Product; quantity: number }[]
+  cartProducts: { product: Product; quantity: number; size?: string; color?: string; cartKey: string }[]
   cartTotal: number
   onClose: () => void
-  onUpdateQuantity: (productId: number, quantity: number) => void
+  onUpdateQuantity: (cartKey: string, quantity: number) => void
   onCheckout: () => void
 }
 
@@ -35,9 +35,9 @@ export function CartDrawer({ cartProducts, cartTotal, onClose, onUpdateQuantity,
         {cartProducts.length ? (
           <>
             <div className="flex-1 space-y-4 overflow-y-auto p-5">
-              {cartProducts.map(({ product, quantity }, i) => (
+              {cartProducts.map(({ product, quantity, size, color, cartKey }, i) => (
                 <article
-                  key={product.id}
+                  key={cartKey}
                   className="flex gap-3 rounded-2xl border border-slate-100 p-3 transition hover:border-violet-100 hover:shadow-sm"
                   style={{ animation: `fadeInUp 0.4s ease ${i * 0.06}s both` }}
                 >
@@ -50,18 +50,23 @@ export function CartDrawer({ cartProducts, cartTotal, onClose, onUpdateQuantity,
                   )}
                   <div className="min-w-0 flex-1">
                     <h3 className="truncate font-bold" style={{ color: '#111426' }}>{product.name}</h3>
+                    {(size || color) && (
+                      <p className="mt-0.5 text-xs font-medium" style={{ color: '#64748b' }}>
+                        {size && `O'lcham: ${size}`} {size && color && ' | '} {color && `Rang: ${color}`}
+                      </p>
+                    )}
                     <p className="mt-1 text-sm font-extrabold" style={{ color: '#111426' }}>{formatPrice(product.price)}</p>
                     <div className="mt-3 flex items-center justify-between">
                       <div className="flex items-center gap-2 rounded-xl p-1" style={{ background: '#f8fafc' }}>
-                        <button onClick={() => onUpdateQuantity(product.id, quantity - 1)} className="grid size-7 place-items-center rounded-lg transition hover:bg-white active:scale-90" style={{ color: '#111426' }}>
+                        <button onClick={() => onUpdateQuantity(cartKey, quantity - 1)} className="grid size-7 place-items-center rounded-lg transition hover:bg-white active:scale-90" style={{ color: '#111426' }}>
                           <Minus size={15} />
                         </button>
                         <b className="w-5 text-center text-sm" style={{ color: '#111426' }}>{quantity}</b>
-                        <button onClick={() => onUpdateQuantity(product.id, quantity + 1)} className="grid size-7 place-items-center rounded-lg transition hover:bg-white active:scale-90" style={{ color: '#111426' }}>
+                        <button onClick={() => onUpdateQuantity(cartKey, quantity + 1)} className="grid size-7 place-items-center rounded-lg transition hover:bg-white active:scale-90" style={{ color: '#111426' }}>
                           <Plus size={15} />
                         </button>
                       </div>
-                      <button onClick={() => onUpdateQuantity(product.id, 0)} className="grid size-8 place-items-center transition hover:scale-110 active:scale-90" style={{ color: '#94a3b8' }}>
+                      <button onClick={() => onUpdateQuantity(cartKey, 0)} className="grid size-8 place-items-center transition hover:scale-110 active:scale-90" style={{ color: '#94a3b8' }}>
                         <Trash2 size={18} />
                       </button>
                     </div>

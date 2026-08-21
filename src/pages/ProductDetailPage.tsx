@@ -7,7 +7,7 @@ import type { Product } from '../types/domain'
 
 type Props = {
   product: Product
-  onAddToCart: () => void
+  onAddToCart: (product: Product, size?: string, color?: string) => void
   onBack: () => void
   likedIds: number[]
   onToggleLike: (id: number) => void
@@ -23,7 +23,7 @@ export function ProductDetailPage({ product, onAddToCart, onBack, likedIds, onTo
   const images = product.images || []
 
   const handleAddToCart = () => {
-    for (let i = 0; i < count; i++) onAddToCart()
+    for (let i = 0; i < count; i++) onAddToCart(product, selectedSize, product.color)
     setCount(1)
   }
 

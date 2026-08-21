@@ -33,7 +33,7 @@ export function useShopStore() {
   const [categories, setCategories] = useState<Category[]>([])
   const [loading, setLoading] = useState(true)
   const [likedIds, setLikedIds] = useState<number[]>(loadLikes)
-  const [cartItems, setCartItems] = useState<Record<number, number>>({})
+  const [cartItems, setCartItems] = useState<Record<string, { quantity: number; size?: string; color?: string }>>({})
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null)
   const [isSearchOpen, setSearchOpen] = useState(false)
   const [isCartOpen, setCartOpen] = useState(false)
@@ -90,22 +90,24 @@ export function useShopStore() {
     }
   }, [])
 
-  const cartCount = Object.values(cartItems).reduce((total, qty) => total + qty, 0)
+  const cartCount = Object.values(cartItems).reduce((total, item) => total + item.quantity, 0)
 
   const cartTotal = useMemo(() => {
-    return Object.entries(cartItems).reduce((sum, [id, qty]) => {
-      const p = products.find((pr) => String(pr.id) === String(id))
-      return sum + (p ? p.price * qty : 0)
+    return Object.entries(cartItems).reduce((sum, [key, item]) => {
+      const pId = Number(key.split('_')[0])
+      const p = products.find((pr) => String(pr.id) === String(pId))
+      return sum + (p ? p.price * item.quantity : 0)
     }, 0)
   }, [cartItems, products])
 
   const cartProducts = useMemo(() => {
     return Object.entries(cartItems)
-      .map(([id, qty]) => {
-        const p = products.find((pr) => String(pr.id) === String(id))
-        return p ? { product: p, quantity: qty } : null
+      .map(([key, item]) => {
+        const pId = Number(key.split('_')[0])
+        const p = products.find((pr) => String(pr.id) === String(pId))
+        return p ? { product: p, quantity: item.quantity, size: item.size, color: item.color, cartKey: key } : null
       })
-      .filter(Boolean) as { product: Product; quantity: number }[]
+      .filter(Boolean) as { product: Product; quantity: number; size?: string; color?: string; cartKey: string }[]
   }, [cartItems, products])
 
   const searchResults = useMemo(
@@ -142,17 +144,27 @@ export function useShopStore() {
     window.setTimeout(() => setToast(null), 2600)
   }, [])
 
-  const addToCart = useCallback((product: Product) => {
-    setCartItems((current) => ({ ...current, [product.id]: (current[product.id] ?? 0) + 1 }))
+  const addToCart = useCallback((product: Product, size?: string, color?: string) => {
+    const s = size || product.sizes?.[0] || 'nosize'
+    const c = color || product.color || 'nocolor'
+    const key = `${product.id}_${s}_${c}`
+    setCartItems((current) => ({
+      ...current,
+      [key]: {
+        quantity: (current[key]?.quantity ?? 0) + 1,
+        size: size || product.sizes?.[0],
+        color: color || product.color
+      }
+    }))
     notify(`${product.name} savatga qo'shildi`)
     hapticFeedback('medium')
   }, [notify])
 
-  const updateCartQuantity = useCallback((productId: number, nextQuantity: number) => {
+  const updateCartQuantity = useCallback((cartKey: string, nextQuantity: number) => {
     setCartItems((current) => {
       const next = { ...current }
-      if (nextQuantity <= 0) delete next[productId]
-      else next[productId] = nextQuantity
+      if (nextQuantity <= 0) delete next[cartKey]
+      else next[cartKey] = { ...next[cartKey], quantity: nextQuantity }
       return next
     })
     hapticFeedback('light')
