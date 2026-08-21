@@ -7,6 +7,7 @@ export type Product = {
   oldPrice?: number
   category: string
   color?: string
+  colors?: string[]
   rating: number
   reviews: number
   images: string[]

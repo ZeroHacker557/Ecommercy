@@ -18,12 +18,14 @@ type Props = {
 export function ProductDetailPage({ product, onAddToCart, onBack, likedIds, onToggleLike, onOpenCart, cartCount }: Props) {
   const [activeImage, setActiveImage] = useState(0)
   const [count, setCount] = useState(1)
+  const colorsList = product.colors || (product.color ? product.color.split(',').map(c => c.trim()).filter(Boolean) : [])
   const [selectedSize, setSelectedSize] = useState(product.sizes?.[0] || '')
+  const [selectedColor, setSelectedColor] = useState(colorsList[0] || '')
   const favourite = likedIds.includes(product.id)
   const images = product.images || []
 
   const handleAddToCart = () => {
-    for (let i = 0; i < count; i++) onAddToCart(product, selectedSize, product.color)
+    for (let i = 0; i < count; i++) onAddToCart(product, selectedSize, selectedColor)
     setCount(1)
   }
 
@@ -90,19 +92,18 @@ export function ProductDetailPage({ product, onAddToCart, onBack, likedIds, onTo
           {product.oldPrice && <del style={{ color: '#94a3b8' }}>{formatPrice(product.oldPrice)}</del>}
         </div>
 
-        {/* Color variants */}
-        {images.length > 1 && (
+        {/* Colors */}
+        {colorsList.length > 0 && (
           <section className="detail-panel">
-            <b style={{ color: '#111426' }}>Rang: <span style={{ color: '#64748b' }} className="font-medium">{product.color || 'Standart'}</span></b>
-            <div className="mt-4 flex gap-3">
-              {images.slice(0, 3).map((img, i) => (
-                <button
-                  onClick={() => setActiveImage(i)}
-                  className="size-20 overflow-hidden rounded-xl border p-1 transition sm:size-24"
-                  style={{ borderColor: activeImage === i ? '#7c3aed' : '#f1f5f9', boxShadow: activeImage === i ? '0 4px 12px rgba(124,58,237,0.15)' : 'none' }}
-                  key={i}
+            <b style={{ color: '#111426' }}>Rangni tanlang</b>
+            <div className="mt-4 flex flex-wrap gap-3">
+              {colorsList.map((c) => (
+                <button 
+                  onClick={() => setSelectedColor(c)} 
+                  className={'size-chip ' + (selectedColor === c ? 'active' : '')} 
+                  key={c}
                 >
-                  <img src={getImageUrl(img)} alt="Rang" className="size-full rounded-lg object-contain" />
+                  <b>{c}</b>
                 </button>
               ))}
             </div>

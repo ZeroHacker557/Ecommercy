@@ -429,7 +429,7 @@ async def cb_skip_sizes(callback: CallbackQuery, state: FSMContext):
     await state.set_state(AddProduct.color)
     await callback.message.edit_text(callback.message.html_text)
     await callback.message.answer(
-        "7️⃣ Rangni yozing.\nMasalan: <code>Qora</code>",
+        "7️⃣ Ranglarni vergul bilan yozing.\nMasalan: <code>Qora, Oq, Qizil</code>",
         reply_markup=skip_kb("color"),
         parse_mode="HTML"
     )
@@ -444,7 +444,7 @@ async def process_sizes(message: Message, state: FSMContext):
     await state.update_data(sizes=sizes)
     await state.set_state(AddProduct.color)
     await message.answer(
-        "7️⃣ Rangni yozing.\nMasalan: <code>Qora</code>",
+        "7️⃣ Ranglarni vergul bilan yozing.\nMasalan: <code>Qora, Oq, Qizil</code>",
         reply_markup=skip_kb("color"),
         parse_mode="HTML"
     )
