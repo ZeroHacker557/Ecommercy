@@ -99,37 +99,45 @@ export function OrdersPage({ orders, cartCount, onSearch, onOpenCart }: Props) {
                 onClick={() => setExpandedId(isExpanded ? null : order.id)}
               >
                 {/* Header row */}
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex-1 min-w-0">
-                    <h3 className="font-extrabold truncate text-base" style={{ color: '#111426' }}>
-                      {order.products.map(p => p.product.name).join(', ')}
-                    </h3>
-                    <p className="mt-1 text-xs font-bold" style={{ color: '#64748b' }}>Buyurtma ID: {order.id}</p>
-                    <p className="mt-0.5 text-[11px]" style={{ color: '#94a3b8' }}>{order.date}</p>
+                <div className="flex flex-col gap-1">
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="text-[11px] font-bold uppercase tracking-wider" style={{ color: '#94a3b8' }}>
+                      {order.date}
+                    </p>
+                    <div className="flex items-center gap-1.5">
+                      {payInfo && !payInfo.needsAction && (
+                        <span className="rounded px-1.5 py-0.5 text-[9px] font-bold uppercase" style={{ background: payInfo.bg, color: payInfo.color }}>
+                          To'landi
+                        </span>
+                      )}
+                      <span className="text-[11px] font-bold uppercase tracking-wider" style={{ color: getStatusColor(order.status) }}>
+                        {order.status}
+                      </span>
+                    </div>
                   </div>
 
-                  <div className="flex flex-col items-end text-right shrink-0">
-                    <p className="text-base font-extrabold sm:text-lg" style={{ color: '#111426' }}>
+                  <div className="mt-1 flex items-start justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <h3 className="truncate text-[15px] font-extrabold leading-tight" style={{ color: '#111426' }}>
+                        {order.products.map(p => p.product.name).join(', ')}
+                      </h3>
+                      <p className="mt-0.5 text-[11px] font-semibold" style={{ color: '#64748b' }}>
+                        {order.products.length} ta mahsulot
+                      </p>
+                    </div>
+                    <p className="shrink-0 text-[15px] font-extrabold" style={{ color: '#111426' }}>
                       {formatPrice(order.total)}
                     </p>
-                    <p className="mt-1 text-xs font-semibold" style={{ color: getStatusColor(order.status) }}>
-                      {order.status}
-                    </p>
-                    {payInfo && !payInfo.needsAction && (
-                      <span
-                        className="mt-1 rounded-full px-2 py-0.5 text-[10px] font-semibold"
-                        style={{ background: payInfo.bg, color: payInfo.color }}
-                      >
-                        {payInfo.label}
-                      </span>
-                    )}
                   </div>
                 </div>
 
-                {/* Toggle text */}
-                <div className="flex items-center justify-center text-xs font-bold mt-1" style={{ color: '#7c3aed' }}>
-                  {isExpanded ? 'Yashirish' : 'Tafsilotlarni ko\'rish'}
-                  <ChevronDown size={14} className={`ml-1 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+                {/* Toggle & ID text */}
+                <div className="mt-1 flex items-center justify-between border-t border-slate-50 pt-2.5">
+                  <p className="text-[11px] font-bold" style={{ color: '#94a3b8' }}>ID: {order.id}</p>
+                  <div className="flex items-center text-xs font-bold" style={{ color: '#7c3aed' }}>
+                    {isExpanded ? 'Yashirish' : 'Tafsilotlar'}
+                    <ChevronDown size={14} className={`ml-1 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+                  </div>
                 </div>
               </div>
 
