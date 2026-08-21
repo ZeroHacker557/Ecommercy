@@ -1,5 +1,5 @@
 """
-ShopOnline Telegram Bot — Admin panel + Mini App + Buyurtma + To'lov tizimi
+ShopOnline Telegram Bot — Admin panel + Mini App + To'lov tizimi
 """
 import asyncio
 import json
@@ -20,108 +20,185 @@ from config import BOT_TOKEN, ADMIN_ID, MINI_APP_URL, CARD_NUMBER, CARD_OWNER
 from admin import router as admin_router
 import firebase_db as db
 
-# Logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger(__name__)
 
-# Bot & Dispatcher
 bot = Bot(token=BOT_TOKEN, default=DefaultBotProperties(parse_mode="HTML"))
-dp = Dispatcher(storage=MemoryStorage())
+dp  = Dispatcher(storage=MemoryStorage())
 dp.include_router(admin_router)
 
 
-# ─── FSM States ──────────────────────────────────────────────
+# ─── FSM ─────────────────────────────────────────────────────
 
 class PaymentUpload(StatesGroup):
     waiting_photo = State()
 
 
-# ─── Keyboards ───────────────────────────────────────────────
+# ─── Status emoji map ─────────────────────────────────────────
 
-def get_main_reply_keyboard(is_admin: bool = False):
-    keyboard = [
+STATUS_EMOJI = {
+    "Qabul qilindi":  "🟢",
+    "Yetkazilmoqda":  "🚚",
+    "Yetkazildi":     "🎉",
+    "Rad etildi":     "🔴",
+    "Bekor qilingan": "🔴",
+}
+
+
+# ─── Klaviaturalar ────────────────────────────────────────────
+
+def main_kb(is_admin: bool = False):
+    rows = [
         [KeyboardButton(text="🛍 Katalogni ochish", web_app=WebAppInfo(url=MINI_APP_URL))],
         [KeyboardButton(text="📦 Buyurtmalarim")],
         [KeyboardButton(text="📞 Biz bilan aloqa"), KeyboardButton(text="ℹ️ Yordam")]
     ]
     if is_admin:
-        keyboard.append([KeyboardButton(text="🛠 Admin Panel")])
-    return ReplyKeyboardMarkup(keyboard=keyboard, resize_keyboard=True)
+        rows.append([KeyboardButton(text="🛠 Admin Panel")])
+    return ReplyKeyboardMarkup(keyboard=rows, resize_keyboard=True)
 
 
-def get_start_inline_keyboard():
+def order_action_kb(order_id: str) -> InlineKeyboardMarkup:
+    """Admin uchun 4ta status tugmasi"""
     return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="🛍 Katalogni ochish (Mini App)", web_app=WebAppInfo(url=MINI_APP_URL))],
-        [InlineKeyboardButton(text="🌐 Brauzerda ochish", url=MINI_APP_URL)]
+        [
+            InlineKeyboardButton(text="✅ Qabul",     callback_data=f"os:Qabul qilindi:{order_id}"),
+            InlineKeyboardButton(text="🚚 Yetkazish", callback_data=f"os:Yetkazilmoqda:{order_id}")
+        ],
+        [
+            InlineKeyboardButton(text="🎉 Bajarildi", callback_data=f"os:Yetkazildi:{order_id}"),
+            InlineKeyboardButton(text="❌ Rad etish", callback_data=f"os:Rad etildi:{order_id}")
+        ]
     ])
 
 
-# ─── Order Notification to Admin ─────────────────────────────
+def receipt_kb(order_id: str) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="💳 To'lov chekini yuborish", callback_data=f"receipt:{order_id}")]
+    ])
+
+
+def resend_receipt_kb(order_id: str) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="💳 Qayta chek yuborish", callback_data=f"receipt:{order_id}")]
+    ])
+
+
+def payment_confirm_kb(order_id: str, user_id: int) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [
+            InlineKeyboardButton(text="✅ Tasdiqlash", callback_data=f"pconf:ok:{order_id}:{user_id}"),
+            InlineKeyboardButton(text="❌ Rad etish",  callback_data=f"pconf:no:{order_id}:{user_id}")
+        ]
+    ])
+
+
+def mini_app_kb() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="🛍 Buyurtmalarimni ko'rish", web_app=WebAppInfo(url=MINI_APP_URL))]
+    ])
+
+
+# ─── Yordamchi funksiyalar ────────────────────────────────────
+
+def get_display_name(order_data: dict) -> str:
+    raw = order_data.get("username", "")
+    if raw and " " not in raw.strip():
+        return f"@{raw}"
+    return raw or order_data.get("customer", {}).get("name", "—")
+
+
+def get_products_text(products: list) -> str:
+    lines = ""
+    for i, p in enumerate(products, 1):
+        qty      = p.get("quantity", 1)
+        prod     = p.get("product") or p
+        name     = prod.get("name", "—")
+        price    = prod.get("price", 0)
+        item_sum = db.format_price(price * qty)
+        lines += f"  <b>{i}. {name}</b>\n"
+        lines += f"     └ {qty} ta × {db.format_price(price)} = <b>{item_sum}</b>\n"
+    return lines
+
+
+# ─── Yangi buyurtma: Admin + User bildirishnomasi ─────────────
 
 async def notify_admin_order(order_data: dict):
-    """Mini App'dan kelgan buyurtmani adminga xabar qilish"""
     try:
-        customer    = order_data.get("customer", {})
-        products    = order_data.get("products", [])
-        total       = order_data.get("total", 0)
-        order_id    = order_data.get("id", "Noma'lum")
-        user_name   = order_data.get("username", customer.get("name", "—"))
-        pay_method  = order_data.get("paymentMethod", "Naqd")
+        customer   = order_data.get("customer", {})
+        products   = order_data.get("products", [])
+        total      = order_data.get("total", 0)
+        order_id   = order_data.get("id", "—")
+        pay_method = order_data.get("paymentMethod", "Naqd")
+        user_id    = order_data.get("userId")
+        total_str  = db.format_price(total) if isinstance(total, (int, float)) else str(total)
+        tg_name    = get_display_name(order_data)
+        pay_label  = "💵 Naqd (yetkazganda)" if pay_method == "Naqd" else "💳 Karta o'tkazmasi"
 
-        total_str = db.format_price(total) if isinstance(total, (int, float)) else str(total)
-
-        text  = f"🛍 <b>YANGI BUYURTMA! ({order_id})</b>\n"
+        # ── ADMIN XABARI ──────────────────────────────────────
+        text  = f"🛒 <b>YANGI BUYURTMA ({order_id})</b>\n"
         text += "━" * 22 + "\n\n"
-        text += f"👤 <b>Mijoz:</b> {user_name}\n"
-        text += f"📞 <b>Telefon:</b> <code>{customer.get('phone', '—')}</code>\n"
+        text += f"📱 <b>Telegram:</b> {tg_name}\n"
+        text += f"👤 <b>Ism:</b> {customer.get('name', '—')}\n"
+        text += f"📞 <b>Tel:</b> <code>{customer.get('phone', '—')}</code>\n"
         text += f"📍 <b>Manzil:</b> {customer.get('address', '—')}\n"
 
         if customer.get("location"):
             lat = customer["location"].get("lat")
             lng = customer["location"].get("lng")
             if lat and lng:
-                map_url = f"https://www.google.com/maps?q={lat},{lng}"
-                text += f"📌 <b>Lokatsiya:</b> <a href='{map_url}'>Xaritada ko'rish</a>\n"
+                text += f"🗺 <a href='https://www.google.com/maps?q={lat},{lng}'>Xaritada ko'rish</a>\n"
 
         if customer.get("comment"):
             text += f"💬 <b>Izoh:</b> {customer['comment']}\n"
 
-        pay_label = "💵 Naqd pul (yetkazganda)" if pay_method == "Naqd" else "💳 Karta o'tkazmasi"
-        text += f"💳 <b>To'lov usuli:</b> {pay_label}\n"
-
-        text += "\n📦 <b>Mahsulotlar:</b>\n"
-        for i, p in enumerate(products, 1):
-            qty = p.get("quantity", 1)
-            prod_info = p.get("product", p)
-            item_total = db.format_price(prod_info.get("price", 0) * qty)
-            text += f"  <b>{i}. {prod_info.get('name', '—')}</b>\n"
-            text += f"     └ {qty} ta × {db.format_price(prod_info.get('price', 0))} = <b>{item_total}</b>\n"
-
-        text += "\n" + "━" * 22 + "\n"
+        text += f"\n💳 <b>To'lov:</b> {pay_label}\n"
+        text += f"\n📦 <b>Mahsulotlar:</b>\n{get_products_text(products)}"
+        text += "━" * 22 + "\n"
         text += f"💰 <b>Jami: {total_str}</b>\n"
-        text += "⏰ <b>Status:</b> 🟡 Yangi\n"
-
+        text += "⏰ <b>Status:</b> 🟡 Yangi"
         if pay_method == "Karta":
-            text += "💳 <b>To'lov:</b> ⏳ Chek kutilmoqda"
+            text += "\n💳 <b>To'lov:</b> ⏳ Chek kutilmoqda"
 
-        kb = InlineKeyboardMarkup(inline_keyboard=[
-            [
-                InlineKeyboardButton(text="✅ Qabul", callback_data=f"os:Qabul qilindi:{order_id}"),
-                InlineKeyboardButton(text="🚚 Yetkazish", callback_data=f"os:Yetkazilmoqda:{order_id}")
-            ],
-            [
-                InlineKeyboardButton(text="🎉 Bajarildi", callback_data=f"os:Yetkazildi:{order_id}"),
-                InlineKeyboardButton(text="❌ Rad etish", callback_data=f"os:Rad etildi:{order_id}")
-            ],
-        ])
+        await bot.send_message(ADMIN_ID, text,
+                               reply_markup=order_action_kb(order_id),
+                               disable_web_page_preview=True)
+        logger.info(f"[ADMIN] Yuborildi: {order_id} | {pay_method}")
 
-        await bot.send_message(ADMIN_ID, text, reply_markup=kb, disable_web_page_preview=True)
-        logger.info(f"[OK] Buyurtma adminga yuborildi: {order_id}")
+        # ── USER XABARI (faqat Karta) ─────────────────────────
+        if pay_method == "Karta":
+            if not user_id:
+                logger.warning(f"[USER] userId yo'q — xabar yuborib bo'lmaydi ({order_id})")
+                return
+            u_text  = "🎉 <b>Buyurtmangiz qabul qilindi!</b>\n"
+            u_text += "━" * 22 + "\n\n"
+            u_text += f"🆔 Buyurtma: <b>{order_id}</b>\n"
+            u_text += "📦 <b>Mahsulotlar:</b>\n"
+            for p in products:
+                qty  = p.get("quantity", 1)
+                prod = p.get("product") or p
+                u_text += f"  • {prod.get('name', '—')} × {qty}\n"
+            u_text += f"\n💰 Jami: <b>{total_str}</b>\n"
+            u_text += "━" * 22 + "\n\n"
+            u_text += "💳 <b>To'lov uchun karta:</b>\n"
+            u_text += f"<code>{CARD_NUMBER}</code>\n"
+            u_text += f"👤 Egasi: <b>{CARD_OWNER}</b>\n\n"
+            u_text += (
+                "📸 Kartaga o'tkazma qilgandan so'ng "
+                "pastdagi tugmani bosib <b>chekni (screenshot)</b> yuboring.\n"
+                "Admin tekshirib tasdiqlaydi ✅"
+            )
+            try:
+                await bot.send_message(user_id, u_text, reply_markup=receipt_kb(order_id))
+                logger.info(f"[USER] Karta xabari yuborildi → {user_id} ({order_id})")
+            except Exception as e:
+                logger.error(f"[USER] Xabar yuborib bo'lmadi {user_id}: {e}")
+
     except Exception as e:
-        logger.error(f"[ERR] Buyurtma yuborishda xato: {e}")
+        logger.error(f"[ADMIN] notify_admin_order xatosi: {e}", exc_info=True)
 
 
-# ─── Order Status Change → Notify User ───────────────────────
+# ─── Status o'zgartirish → Usergа xabar ──────────────────────
 
 @dp.callback_query(F.data.startswith("os:"))
 async def cb_order_status(callback: CallbackQuery):
@@ -130,121 +207,89 @@ async def cb_order_status(callback: CallbackQuery):
 
     _, status, order_id = callback.data.split(":", 2)
 
-    updated = db.update_order_status(order_id, status)
-    if not updated:
-        await callback.answer("❌ Firestore'da yangilashda xatolik", show_alert=True)
+    if not db.update_order_status(order_id, status):
+        await callback.answer("❌ Firestore yangilanmadi", show_alert=True)
         return
 
-    status_emoji_map = {
-        "Qabul qilindi": "🟢",
-        "Yetkazilmoqda": "🚚",
-        "Yetkazildi":    "🎉",
-        "Rad etildi":    "🔴",
-        "Bekor qilingan":"🔴",
-    }
-    emoji = status_emoji_map.get(status, "ℹ️")
+    emoji = STATUS_EMOJI.get(status, "ℹ️")
 
-    # ── Foydalanuvchiga xabar yuborish ──
+    # User'ga xabar
     order = db.get_order_by_id(order_id)
     if order and order.get("userId"):
         try:
-            user_text  = f"📦 <b>Buyurtmangiz yangilandi!</b>\n"
-            user_text += "━" * 22 + "\n\n"
-            user_text += f"🆔 Buyurtma: <b>{order_id}</b>\n"
-            user_text += f"⏰ Yangi status: {emoji} <b>{status}</b>\n\n"
-            user_text += "Batafsil ko'rish uchun 👇"
-            user_kb = InlineKeyboardMarkup(inline_keyboard=[
-                [InlineKeyboardButton(
-                    text="🛍 Buyurtmalarimni ko'rish",
-                    web_app=WebAppInfo(url=MINI_APP_URL)
-                )]
-            ])
-            await bot.send_message(order["userId"], user_text, reply_markup=user_kb)
+            u_text  = "📦 <b>Buyurtmangiz yangilandi!</b>\n"
+            u_text += "━" * 22 + "\n\n"
+            u_text += f"🆔 Buyurtma: <b>{order_id}</b>\n"
+            u_text += f"⏰ Yangi status: {emoji} <b>{status}</b>\n\n"
+            u_text += "Batafsil ko'rish uchun 👇"
+            await bot.send_message(order["userId"], u_text, reply_markup=mini_app_kb())
         except Exception as e:
-            logger.warning(f"Foydalanuvchiga xabar yuborib bo'lmadi: {e}")
+            logger.warning(f"[USER] Status xabar xatosi: {e}")
 
-    # ── Admin xabarini yangilash ──
-    current_text = callback.message.html_text
-    if "⏰ <b>Status:</b>" in current_text:
-        new_text = current_text.split("⏰ <b>Status:</b>")[0] + f"⏰ <b>Status:</b> {emoji} {status}"
+    # Admin xabarini yangilash
+    old = callback.message.html_text
+    if "⏰ <b>Status:</b>" in old:
+        new = old.split("⏰ <b>Status:</b>")[0] + f"⏰ <b>Status:</b> {emoji} {status}"
     else:
-        new_text = current_text + f"\n⏰ <b>Status:</b> {emoji} {status}"
+        new = old + f"\n⏰ <b>Status:</b> {emoji} {status}"
 
-    await callback.message.edit_text(
-        new_text, reply_markup=callback.message.reply_markup,
-        disable_web_page_preview=True
-    )
-    await callback.answer(f"✅ Status: {status}")
+    try:
+        await callback.message.edit_text(new, reply_markup=callback.message.reply_markup,
+                                         disable_web_page_preview=True)
+    except Exception:
+        pass
+    await callback.answer(f"✅ {status}")
 
 
-# ─── Chek yuborish: callback tugma ───────────────────────────
+# ─── Chek yuborish ────────────────────────────────────────────
 
-@dp.callback_query(F.data.startswith("send_receipt:"))
-async def cb_send_receipt(callback: CallbackQuery, state: FSMContext):
-    order_id = callback.data.split("send_receipt:", 1)[-1]
+@dp.callback_query(F.data.startswith("receipt:"))
+async def cb_start_receipt(callback: CallbackQuery, state: FSMContext):
+    order_id = callback.data.split("receipt:", 1)[-1]
     await state.update_data(receipt_order_id=order_id)
     await state.set_state(PaymentUpload.waiting_photo)
     await callback.message.answer(
         "📸 <b>To'lov chekini yuboring</b>\n\n"
-        "Pul o'tkazganingizni tasdiqlovchi <b>screenshot yoki rasmni</b> yuboring.\n"
-        "Admin tekshirib, tasdiqlaydi ✅",
+        "Pul o'tkazilganini tasdiqlovchi <b>screenshot yoki rasmni</b> yuboring:"
     )
     await callback.answer()
 
 
-# ─── Chek rasmi keldi → Adminga yuborish ────────────────────
-
 @dp.message(PaymentUpload.waiting_photo, F.photo)
 async def handle_receipt_photo(message: Message, state: FSMContext):
-    data = await state.get_data()
+    data     = await state.get_data()
     order_id = data.get("receipt_order_id", "—")
     user_id  = message.from_user.id
 
-    order = db.get_order_by_id(order_id) if order_id != "—" else None
-
-    # Adminga caption
-    caption  = "💳 <b>TO'LOV CHEKI KELDI!</b>\n"
-    caption += "━" * 22 + "\n\n"
+    order   = db.get_order_by_id(order_id) if order_id != "—" else None
+    caption = "💳 <b>TO'LOV CHEKI!</b>\n" + "━" * 22 + "\n\n"
     caption += f"📦 Buyurtma: <b>{order_id}</b>\n"
     if order:
-        uname = order.get("username") or order.get("customer", {}).get("name", "—")
-        phone = order.get("customer", {}).get("phone", "—")
-        total = order.get("total", 0)
-        caption += f"👤 Mijoz: {uname}\n"
-        caption += f"📞 Telefon: <code>{phone}</code>\n"
-        caption += f"💰 Summa: <b>{db.format_price(total) if isinstance(total,(int,float)) else total}</b>\n"
+        caption += f"📱 Mijoz: {get_display_name(order)}\n"
+        caption += f"📞 Tel: <code>{order.get('customer', {}).get('phone', '—')}</code>\n"
+        tot = order.get("total", 0)
+        caption += f"💰 Summa: <b>{db.format_price(tot) if isinstance(tot,(int,float)) else tot}</b>\n"
     caption += "━" * 22
 
-    admin_kb = InlineKeyboardMarkup(inline_keyboard=[
-        [
-            InlineKeyboardButton(
-                text="✅ To'lovni tasdiqlash",
-                callback_data=f"pconf:approve:{order_id}:{user_id}"
-            ),
-            InlineKeyboardButton(
-                text="❌ Rad etish",
-                callback_data=f"pconf:reject:{order_id}:{user_id}"
-            )
-        ]
-    ])
-
-    photo_file_id = message.photo[-1].file_id
-    await bot.send_photo(ADMIN_ID, photo=photo_file_id, caption=caption,
-                         reply_markup=admin_kb)
+    try:
+        await bot.send_photo(ADMIN_ID,
+                             photo=message.photo[-1].file_id,
+                             caption=caption,
+                             reply_markup=payment_confirm_kb(order_id, user_id))
+        logger.info(f"[RECEIPT] Adminga yo'naltirildi: {order_id} ← {user_id}")
+    except Exception as e:
+        logger.error(f"[RECEIPT] Adminga yuborib bo'lmadi: {e}")
 
     await state.clear()
     await message.answer(
         "✅ <b>Chekingiz yuborildi!</b>\n\n"
-        "Admin tekshirib, tez orada natijasini xabar qilamiz 📬"
+        "Admin tekshirib, tez orada xabar beramiz 📬"
     )
 
 
 @dp.message(PaymentUpload.waiting_photo)
-async def handle_receipt_not_photo(message: Message):
-    await message.answer(
-        "❌ Iltimos, to'lov chekini <b>rasm (foto) sifatida</b> yuboring!\n"
-        "Faylni bosing → rasm tanlang → yuboring."
-    )
+async def handle_receipt_wrong(message: Message):
+    await message.answer("❌ Iltimos, to'lov chekini <b>rasm (foto)</b> sifatida yuboring.")
 
 
 # ─── Admin: To'lovni tasdiqlash / rad etish ──────────────────
@@ -254,64 +299,70 @@ async def cb_payment_confirm(callback: CallbackQuery):
     if callback.from_user.id != ADMIN_ID:
         return
 
-    parts   = callback.data.split(":")
-    action  = parts[1]                   # approve | reject
-    order_id = parts[2]                  # #1234567
-    user_id  = int(parts[3])             # Telegram user ID
+    parts    = callback.data.split(":")
+    action   = parts[1]        # ok | no
+    order_id = parts[2]        # #xxxxxxx
+    user_id  = int(parts[3])
 
-    if action == "approve":
+    if action == "ok":
         db.update_payment_status(order_id, "Tolangan")
+        logger.info(f"[PAY] Tasdiqlandi: {order_id}")
 
-        # Foydalanuvchiga xabar
+        # Usergа xabar
         try:
-            user_text  = "✅ <b>To'lovingiz tasdiqlandi!</b>\n"
-            user_text += "━" * 22 + "\n\n"
-            user_text += f"📦 Buyurtma: <b>{order_id}</b>\n"
-            user_text += "💰 To'lov muvaffaqiyatli qabul qilindi!\n"
-            user_text += "Tez orada buyurtmangiz yetkaziladi 🚀"
-            user_kb = InlineKeyboardMarkup(inline_keyboard=[
-                [InlineKeyboardButton(
-                    text="🛍 Buyurtmalarimni ko'rish",
-                    web_app=WebAppInfo(url=MINI_APP_URL)
-                )]
-            ])
-            await bot.send_message(user_id, user_text, reply_markup=user_kb)
+            u_text  = "✅ <b>To'lovingiz tasdiqlandi!</b>\n"
+            u_text += "━" * 22 + "\n\n"
+            u_text += f"📦 Buyurtma: <b>{order_id}</b>\n"
+            u_text += "💰 To'lov qabul qilindi! Tez orada yetkaziladi 🚀"
+            await bot.send_message(user_id, u_text, reply_markup=mini_app_kb())
         except Exception as e:
-            logger.warning(f"User {user_id} ga xabar yuborib bo'lmadi: {e}")
+            logger.warning(f"[PAY] User xabari: {e}")
 
-        # Admin xabarini yangilash
+        # Chek xabarini yangilash
         try:
-            new_caption = (callback.message.caption or "") + "\n\n✅ <b>TO'LOV TASDIQLANDI</b>"
-            await callback.message.edit_caption(new_caption)
+            await callback.message.edit_caption(
+                (callback.message.caption or "") + "\n\n✅ <b>TASDIQLANDI</b>"
+            )
         except Exception:
             pass
-        await callback.answer("✅ To'lov tasdiqlandi!", show_alert=True)
 
-    elif action == "reject":
+        # Admin uchun status tugmalarini qayta yuborish
+        await bot.send_message(
+            ADMIN_ID,
+            f"📦 <b>{order_id}</b> — to'lov tasdiqlandi ✅\nBuyurtma statusini o'zgartiring:",
+            reply_markup=order_action_kb(order_id)
+        )
+        await callback.answer("✅ Tasdiqlandi!", show_alert=True)
+
+    elif action == "no":
         db.update_payment_status(order_id, "Rad etildi")
+        logger.info(f"[PAY] Rad etildi: {order_id}")
 
-        # Foydalanuvchiga xabar + qayta yuborish tugmasi
+        # Usergа xabar
         try:
-            user_text  = "❌ <b>To'lov cheki rad etildi</b>\n"
-            user_text += "━" * 22 + "\n\n"
-            user_text += f"📦 Buyurtma: <b>{order_id}</b>\n"
-            user_text += "Iltimos, to'g'ri to'lov chekini qayta yuboring."
-            user_kb = InlineKeyboardMarkup(inline_keyboard=[
-                [InlineKeyboardButton(
-                    text="💳 Qayta chek yuborish",
-                    callback_data=f"send_receipt:{order_id}"
-                )]
-            ])
-            await bot.send_message(user_id, user_text, reply_markup=user_kb)
+            u_text  = "❌ <b>To'lov cheki rad etildi</b>\n"
+            u_text += "━" * 22 + "\n\n"
+            u_text += f"📦 Buyurtma: <b>{order_id}</b>\n"
+            u_text += "Iltimos, to'g'ri chekni qayta yuboring."
+            await bot.send_message(user_id, u_text, reply_markup=resend_receipt_kb(order_id))
         except Exception as e:
-            logger.warning(f"User {user_id} ga xabar yuborib bo'lmadi: {e}")
+            logger.warning(f"[PAY] User xabari: {e}")
 
+        # Chek xabarini yangilash
         try:
-            new_caption = (callback.message.caption or "") + "\n\n❌ <b>RAD ETILDI — Mijoz qayta yuboradi</b>"
-            await callback.message.edit_caption(new_caption)
+            await callback.message.edit_caption(
+                (callback.message.caption or "") + "\n\n❌ <b>RAD ETILDI</b>"
+            )
         except Exception:
             pass
-        await callback.answer("❌ Chek rad etildi!", show_alert=True)
+
+        # Admin uchun status tugmalarini qayta yuborish
+        await bot.send_message(
+            ADMIN_ID,
+            f"📦 <b>{order_id}</b> — chek rad etildi ❌ (mijoz qayta yuboradi)\nBuyurtma statusini o'zgartiring:",
+            reply_markup=order_action_kb(order_id)
+        )
+        await callback.answer("❌ Rad etildi!", show_alert=True)
 
 
 # ─── Buyurtmalarim ───────────────────────────────────────────
@@ -324,85 +375,108 @@ async def handle_my_orders(message: Message):
     if not orders:
         await message.answer(
             "📦 <b>Buyurtmalarim</b>\n\n"
-            "Hali hech qanday buyurtma berilmagan.\n"
-            "Katalogdan mahsulot tanlab buyurtma bering! 🛍",
+            "Hali buyurtma berilmagan.\n"
+            "Katalogdan xarid qiling! 🛍"
         )
         return
 
-    status_emoji = {
-        "Yangi":          "🟡",
-        "Qabul qilindi":  "🟢",
-        "Yetkazilmoqda":  "🚚",
-        "Yetkazildi":     "🎉",
-        "Rad etildi":     "🔴",
-        "Bekor qilingan": "🔴",
-    }
-    pay_label_map = {
-        "Tolangan":   "✅ To'langan",
-        "Kutilmoqda": "⏳ Chek kutilmoqda",
-        "Rad etildi": "❌ Rad etildi",
-    }
+    text = f"📦 <b>Buyurtmalarim</b> ({len(orders)} ta)\n" + "━" * 22 + "\n\n"
+    btns = []
 
-    text  = f"📦 <b>Sizning buyurtmalaringiz</b> ({len(orders)} ta)\n"
-    text += "━" * 22 + "\n\n"
+    for o in orders[:10]:
+        oid  = o.get("id", "—")
+        tot  = o.get("total", 0)
+        st   = o.get("status", "Yangi")
+        pm   = o.get("paymentMethod", "Naqd")
+        ps   = o.get("paymentStatus", "")
+        e    = STATUS_EMOJI.get(st, "🟡")
+        tstr = db.format_price(tot) if isinstance(tot, (int, float)) else str(tot)
 
-    receipt_buttons = []
-    for order in orders[:10]:
-        oid         = order.get("id", "—")
-        total       = order.get("total", 0)
-        status      = order.get("status", "Yangi")
-        pay_method  = order.get("paymentMethod", "Naqd")
-        pay_status  = order.get("paymentStatus", "")
-        e           = status_emoji.get(status, "ℹ️")
-        total_str   = db.format_price(total) if isinstance(total, (int, float)) else str(total)
+        text += f"🆔 <b>{oid}</b> — {tstr}\n"
+        text += f"   {e} {st}\n"
 
-        text += f"🆔 <b>{oid}</b> • {total_str}\n"
-        text += f"   ⏰ Status: {e} {status}\n"
-
-        if pay_method == "Karta":
-            plabel = pay_label_map.get(pay_status, "⏳ Chek kutilmoqda")
-            text  += f"   💳 To'lov: {plabel}\n"
-            # Chek yuborilmagan yoki rad etilgan bo'lsa tugma qo'shamiz
-            if pay_status in ("", "Kutilmoqda", "Rad etildi"):
-                receipt_buttons.append([
-                    InlineKeyboardButton(
-                        text=f"💳 {oid} — chek yuborish",
-                        callback_data=f"send_receipt:{oid}"
-                    )
-                ])
+        if pm == "Karta":
+            if ps == "Tolangan":
+                text += "   ✅ To'lov tasdiqlangan\n"
+            elif ps == "Rad etildi":
+                text += "   ❌ Chek rad etildi\n"
+                btns.append([InlineKeyboardButton(
+                    text=f"💳 {oid} — qayta chek",
+                    callback_data=f"receipt:{oid}"
+                )])
+            else:
+                text += "   ⏳ Chek kutilmoqda\n"
+                btns.append([InlineKeyboardButton(
+                    text=f"💳 {oid} — chek yuborish",
+                    callback_data=f"receipt:{oid}"
+                )])
         else:
-            text += "   💵 To'lov: Naqd (yetkazganda)\n"
-
+            text += "   💵 Naqd (yetkazganda)\n"
         text += "\n"
 
-    kb = InlineKeyboardMarkup(inline_keyboard=receipt_buttons) if receipt_buttons else None
+    kb = InlineKeyboardMarkup(inline_keyboard=btns) if btns else None
     await message.answer(text, reply_markup=kb)
 
 
-# ─── Start Command ───────────────────────────────────────────
+# ─── /start ──────────────────────────────────────────────────
 
-@dp.message(F.text == "/start")
-async def cmd_start(message: Message):
+@dp.message(F.text.startswith("/start"))
+async def cmd_start(message: Message, state: FSMContext):
     user     = message.from_user
     is_admin = user.id == ADMIN_ID
 
-    welcome  = (
+    # ── Deep link: /start receipt_1234567 ──
+    parts = message.text.split(" ", 1)
+    if len(parts) > 1 and parts[1].startswith("receipt_"):
+        raw_id   = parts[1].replace("receipt_", "").strip()
+        order_id = f"#{raw_id}"
+
+        order = db.get_order_by_id(order_id)
+        if order:
+            products  = order.get("products", [])
+            total     = order.get("total", 0)
+            total_str = db.format_price(total) if isinstance(total, (int, float)) else str(total)
+
+            await state.update_data(receipt_order_id=order_id)
+            await state.set_state(PaymentUpload.waiting_photo)
+
+            u_text  = "💳 <b>To'lov ma'lumotlari</b>\n"
+            u_text += "━" * 22 + "\n\n"
+            u_text += f"🆔 Buyurtma: <b>{order_id}</b>\n"
+            u_text += "📦 <b>Mahsulotlar:</b>\n"
+            for p in products:
+                qty  = p.get("quantity", 1)
+                prod = p.get("product") or p
+                u_text += f"  • {prod.get('name', '—')} × {qty}\n"
+            u_text += f"\n💰 Jami: <b>{total_str}</b>\n"
+            u_text += "━" * 22 + "\n\n"
+            u_text += "💳 <b>Karta raqami:</b>\n"
+            u_text += f"<code>{CARD_NUMBER}</code>\n"
+            u_text += f"👤 Egasi: <b>{CARD_OWNER}</b>\n\n"
+            u_text += "📸 Pul o'tkazgandan so'ng <b>to'lov chekini (screenshot)</b> yuboring:"
+            await message.answer(u_text, reply_markup=main_kb(is_admin))
+        else:
+            await message.answer(
+                f"❌ <b>{order_id}</b> buyurtma topilmadi.\n"
+                "Iltimos, qayta urinib ko'ring.",
+                reply_markup=main_kb(is_admin)
+            )
+        return
+
+    # ── Oddiy /start ──
+    text = (
         f"Assalomu alaykum, <b>{user.first_name}</b>! 👋\n\n"
-        "✨ <b>ShopOnline</b> — qulay va sifatli internet do'konga xush kelibsiz!\n\n"
-        "🛒 Mini App orqali barcha mahsulotlarni ko'rish, savatga qo'shish "
-        "va tezkor buyurtma berish mumkin.\n\n"
-        "👇 Pastdagi <b>\"🛍 Katalogni ochish\"</b> tugmasini bosing:"
+        "✨ <b>ShopOnline</b> do'koniga xush kelibsiz!\n\n"
+        "🛒 <b>\"🛍 Katalogni ochish\"</b> tugmasini bosing.\n"
+        "📦 Buyurtmalar: <b>\"📦 Buyurtmalarim\"</b>"
     )
     if is_admin:
-        welcome += "\n\n🔑 <b>Siz adminsiz:</b> <b>🛠 Admin Panel</b> tugmasini bosing yoki /admin yuboring."
+        text += "\n\n🔑 <b>Admin:</b> /admin yoki 🛠 Admin Panel"
+    await message.answer(text, reply_markup=main_kb(is_admin))
 
-    await message.answer(welcome, reply_markup=get_main_reply_keyboard(is_admin))
-
-
-# ─── Reply keyboard handlers ─────────────────────────────────
 
 @dp.message(F.text == "🛠 Admin Panel")
-async def handle_admin_panel_button(message: Message, state: FSMContext):
+async def handle_admin_btn(message: Message, state: FSMContext):
     from admin import cmd_admin
     await cmd_admin(message, state)
 
@@ -411,103 +485,69 @@ async def handle_admin_panel_button(message: Message, state: FSMContext):
 async def cmd_contact(message: Message):
     await message.answer(
         "📞 <b>Biz bilan aloqa:</b>\n\n"
-        "👨‍💻 <b>Qo'llab-quvvatlash:</b> @admin\n"
-        "📞 <b>Telefon:</b> +998 90 123 45 67\n"
-        "📍 <b>Manzil:</b> Toshkent shahri\n"
-        "⏰ <b>Ish vaqti:</b> 09:00 - 20:00 (Hamma kunlar)"
+        "👨‍💻 <b>Support:</b> @admin\n"
+        "📞 <b>Tel:</b> +998 90 123 45 67\n"
+        "📍 <b>Manzil:</b> Toshkent\n"
+        "⏰ <b>Ish vaqti:</b> 09:00–20:00"
     )
 
 
 @dp.message(F.text.in_({"ℹ️ Yordam", "/help"}))
 async def cmd_help(message: Message):
-    text = (
+    await message.answer(
         "ℹ️ <b>Qanday xarid qilinadi?</b>\n\n"
-        "1️⃣ <b>\"🛍 Katalogni ochish\"</b> tugmasini bosing.\n"
-        "2️⃣ O'zingizga yoqqan mahsulotlarni savatchaga qo'shing.\n"
-        "3️⃣ Buyurtma berish tugmasini bosib, ma'lumotlaringizni kiriting.\n"
-        "4️⃣ <b>To'lov usulini tanlang:</b> 💵 Naqd yoki 💳 Karta.\n"
-        "5️⃣ Karta tanlasangiz — pul o'tkazib, chekni botga yuboring.\n"
-        "6️⃣ Admin tasdiqlagach, buyurtmangiz yetkaziladi! 🚀\n\n"
-        "📦 Buyurtmalaringizni ko'rish: <b>\"📦 Buyurtmalarim\"</b> tugmasi\n\n"
-        "❓ Qo'shimcha savollar: <b>📞 Biz bilan aloqa</b>"
+        "1️⃣ \"🛍 Katalogni ochish\" → Mahsulot tanlang\n"
+        "2️⃣ Savatga qo'shing → Buyurtma bering\n"
+        "3️⃣ To'lov usulini tanlang: 💵 Naqd yoki 💳 Karta\n"
+        "4️⃣ Karta: pul o'tkaz → chekni botga yubor\n"
+        "5️⃣ Admin tasdiqlaydi → yetkaziladi 🚀\n\n"
+        "📦 Buyurtmalar: \"📦 Buyurtmalarim\" tugmasi"
     )
-    if message.from_user.id == ADMIN_ID:
-        text += "\n\n🛠 <b>Admin buyruqlari:</b>\n/admin — Admin panelni ochish"
-    await message.answer(text)
 
 
-# ─── WebApp Data — Buyurtma ──────────────────────────────────
+# ─── WebApp sendData (fallback) ───────────────────────────────
 
 @dp.message(F.web_app_data)
 async def handle_webapp_data(message: Message):
-    """WebApp.sendData() orqali kelgan buyurtmani qayta ishlash"""
     try:
-        data        = json.loads(message.web_app_data.data)
-        pay_method  = data.get("paymentMethod", "Naqd")
-        order_id    = data.get("id", "")
-
+        data       = json.loads(message.web_app_data.data)
+        pay_method = data.get("paymentMethod", "Naqd")
+        order_id   = data.get("id", "")
         await notify_admin_order(data)
-
-        if pay_method == "Karta":
-            text  = (
-                "🎉 <b>Buyurtmangiz qabul qilindi!</b>\n"
-                "━" * 22 + "\n\n"
-                f"🆔 Buyurtma: <b>{order_id}</b>\n\n"
-                "💳 <b>Endi to'lovni amalga oshiring:</b>\n\n"
-                f"🏦 Karta raqami:\n"
-                f"<code>{CARD_NUMBER}</code>\n"
-                f"👤 Egasi: <b>{CARD_OWNER}</b>\n\n"
-                "📸 Pul o'tkazgandan so'ng, pastdagi tugmani bosib "
-                "<b>to'lov chekini (screenshot)</b> yuboring.\n"
-                "Admin tekshirib, buyurtmangizni tasdiqlaydi ✅"
-            )
-            kb = InlineKeyboardMarkup(inline_keyboard=[
-                [InlineKeyboardButton(
-                    text="💳 To'lov chekini yuborish",
-                    callback_data=f"send_receipt:{order_id}"
-                )]
-            ])
-            await message.answer(text, reply_markup=kb)
-        else:
+        if pay_method == "Naqd":
             await message.answer(
-                "🎉 <b>Buyurtmangiz muvaffaqiyatli qabul qilindi!</b>\n\n"
+                f"🎉 <b>Buyurtmangiz qabul qilindi!</b>\n"
                 f"🆔 Buyurtma: <b>{order_id}</b>\n"
-                "💵 To'lov: Naqd pul (yetkazganda)\n\n"
-                "Tez orada operatorimiz siz bilan bog'lanadi 📞\n"
-                "Xaridingiz uchun rahmat! 🛍"
+                "💵 To'lov: Naqd (yetkazganda)\n\n"
+                "Operatorimiz tez orada bog'lanadi 📞"
             )
     except Exception as e:
-        logger.error(f"WebApp data error: {e}")
-        await message.answer("❌ Xatolik yuz berdi. Iltimos, qayta urinib ko'ring.")
+        logger.error(f"WebApp data: {e}")
+        await message.answer("❌ Xatolik. Qayta urinib ko'ring.")
 
 
-# ─── Main ────────────────────────────────────────────────────
+# ─── Main ─────────────────────────────────────────────────────
 
 async def main():
     try:
         await bot.set_chat_menu_button(
-            menu_button=MenuButtonWebApp(
-                text="🛍 Katalog",
-                web_app=WebAppInfo(url=MINI_APP_URL)
-            )
+            menu_button=MenuButtonWebApp(text="🛍 Katalog", web_app=WebAppInfo(url=MINI_APP_URL))
         )
-        logger.info("[BOT] Menu Button sozlandi")
     except Exception as e:
-        logger.warning(f"[BOT] Menu Button: {e}")
+        logger.warning(f"Menu button: {e}")
 
     loop = asyncio.get_running_loop()
 
     def on_new_order(order_data):
         asyncio.run_coroutine_threadsafe(notify_admin_order(order_data), loop)
 
-    order_watch = db.listen_to_new_orders(on_new_order)
-    logger.info("[FIRESTORE] Real-time orders listener ishga tushdi")
+    watch = db.listen_to_new_orders(on_new_order)
+    logger.info("[BOT] Ishga tushdi ✅")
 
-    logger.info("[BOT] Ishga tushmoqda...")
     try:
         await dp.start_polling(bot)
     finally:
-        order_watch.unsubscribe()
+        watch.unsubscribe()
         await bot.session.close()
 
 

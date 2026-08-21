@@ -3,7 +3,10 @@ import { ChevronDown, ChevronRight, ExternalLink, ShoppingBag, SlidersHorizontal
 import { formatPrice } from '../data'
 import { PageHeader } from '../components/layout/PageHeader'
 import { OrderImages } from '../components/order/OrderImages'
+import { openBotDeepLink } from '../utils/telegram'
 import type { Order } from '../types/domain'
+
+const BOT_USERNAME = 'ecommercy_test_bot'
 
 const tabs = ['Barchasi', 'Yangi', 'Qabul qilindi', 'Bekor qilingan']
 
@@ -39,12 +42,20 @@ export function OrdersPage({ orders, cartCount, onSearch, onOpenCart }: Props) {
     return '#7c3aed'
   }
 
-  const getPaymentBadge = (order: Order) => {
+  /** Karta uchun to'lov holati badge va tugma */
+  const getPayInfo = (order: Order) => {
     if (order.paymentMethod !== 'Karta') return null
     const s = order.paymentStatus
-    if (s === 'Tolangan')   return { label: '✅ To\'lov tasdiqlandi', color: '#16a34a', bg: '#dcfce7' }
+    if (s === 'Tolangan') return { label: '✅ To\'lov tasdiqlandi', color: '#16a34a', bg: '#dcfce7', needsAction: false }
     if (s === 'Rad etildi') return { label: '❌ Chek rad etildi', color: '#ef4444', bg: '#fee2e2', needsAction: true }
     return { label: '⏳ Chek kutilmoqda', color: '#d97706', bg: '#fef9c3', needsAction: true }
+  }
+
+  /** Botni ochib, FSM orqali chek so'rash */
+  const handleSendReceipt = (orderId: string) => {
+    // # belgisini olib tashlaymiz (URL xavfsizligi uchun)
+    const safeId = orderId.replace('#', '')
+    openBotDeepLink(BOT_USERNAME, `receipt_${safeId}`)
   }
 
   return (
@@ -76,70 +87,61 @@ export function OrdersPage({ orders, cartCount, onSearch, onOpenCart }: Props) {
       {/* Orders */}
       <section className="space-y-4 px-5 pb-32 pt-6 sm:px-10">
         {shown.map((order, i) => {
-          const payBadge = getPaymentBadge(order)
+          const payInfo = getPayInfo(order)
           return (
-            <div key={order.id} className="order-card" style={{ animationDelay: `${i * 0.08}s` }}>
-              {/* Left */}
-              <div className="flex-1 min-w-0">
-                <h3 className="font-extrabold" style={{ color: '#111426' }}>
-                  {order.id}
-                </h3>
-                <p className="mt-1 text-sm" style={{ color: '#64748b' }}>
-                  {order.date}
-                </p>
-                <div className="mt-3">
-                  <OrderImages products={order.products} />
-                  <p className="mt-2 text-sm" style={{ color: '#64748b' }}>
-                    {order.products.length} ta mahsulot
-                  </p>
+            <div key={order.id} className="order-card flex-col gap-3" style={{ animationDelay: `${i * 0.08}s` }}>
+              {/* Header row */}
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex-1 min-w-0">
+                  <h3 className="font-extrabold" style={{ color: '#111426' }}>{order.id}</h3>
+                  <p className="mt-0.5 text-sm" style={{ color: '#64748b' }}>{order.date}</p>
+                  <div className="mt-3">
+                    <OrderImages products={order.products} />
+                    <p className="mt-2 text-sm" style={{ color: '#64748b' }}>{order.products.length} ta mahsulot</p>
+                  </div>
                 </div>
 
-                {/* Payment badge needing action */}
-                {payBadge?.needsAction && (
-                  <div
-                    className="mt-3 inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-bold"
-                    style={{ background: payBadge.bg, color: payBadge.color }}
-                  >
-                    <ExternalLink size={12} />
-                    {payBadge.label} — botga chek yuboring
-                  </div>
-                )}
+                <div className="flex flex-col items-end text-right shrink-0">
+                  <p className="text-lg font-extrabold sm:text-xl" style={{ color: '#111426' }}>
+                    {formatPrice(order.total)}
+                  </p>
+                  <p className="mt-1 text-sm font-semibold" style={{ color: getStatusColor(order.status) }}>
+                    {order.status}
+                  </p>
+                  {payInfo && !payInfo.needsAction && (
+                    <span
+                      className="mt-1 rounded-full px-2 py-0.5 text-xs font-semibold"
+                      style={{ background: payInfo.bg, color: payInfo.color }}
+                    >
+                      {payInfo.label}
+                    </span>
+                  )}
+                  <ChevronRight className="mt-auto" style={{ color: '#7c3aed' }} />
+                </div>
               </div>
 
-              {/* Right */}
-              <div className="flex flex-col items-end justify-between text-right shrink-0">
-                <p className="text-lg font-extrabold sm:text-xl" style={{ color: '#111426' }}>
-                  {formatPrice(order.total)}
-                </p>
-                <p className="mt-1 text-sm font-semibold" style={{ color: getStatusColor(order.status) }}>
-                  {order.status}
-                </p>
-
-                {/* Payment badge confirmed */}
-                {payBadge && !payBadge.needsAction && (
-                  <span
-                    className="mt-1 rounded-full px-2 py-0.5 text-xs font-semibold"
-                    style={{ background: payBadge.bg, color: payBadge.color }}
-                  >
-                    {payBadge.label}
-                  </span>
-                )}
-
-                <ChevronRight className="mt-auto" style={{ color: '#7c3aed' }} />
-              </div>
+              {/* Chek yuborish tugmasi — faqat Karta + to'lanmagan */}
+              {payInfo?.needsAction && (
+                <button
+                  onClick={() => handleSendReceipt(order.id)}
+                  className="flex w-full items-center justify-center gap-2 rounded-2xl py-3 text-sm font-bold transition active:scale-95"
+                  style={{
+                    background: payInfo.color === '#ef4444' ? '#fee2e2' : '#fef9c3',
+                    color: payInfo.color,
+                    border: `1.5px solid ${payInfo.color}30`,
+                  }}
+                >
+                  <ExternalLink size={15} />
+                  {payInfo.color === '#ef4444' ? '💳 Qayta chek yuborish' : '💳 To\'lov chekini yuborish'}
+                </button>
+              )}
             </div>
           )
         })}
 
         {!shown.length && (
-          <div
-            className="flex flex-col items-center py-20 text-center"
-            style={{ animation: 'fadeInUp 0.5s ease' }}
-          >
-            <span
-              className="grid size-20 place-items-center rounded-full"
-              style={{ background: '#f5f0ff', color: '#a78bfa' }}
-            >
+          <div className="flex flex-col items-center py-20 text-center" style={{ animation: 'fadeInUp 0.5s ease' }}>
+            <span className="grid size-20 place-items-center rounded-full" style={{ background: '#f5f0ff', color: '#a78bfa' }}>
               <ShoppingBag size={36} />
             </span>
             <p className="mt-5 text-lg font-bold" style={{ color: '#334155' }}>

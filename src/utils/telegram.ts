@@ -62,6 +62,7 @@ interface TelegramWebApp {
   close: () => void
   sendData: (data: string) => void
   openLink: (url: string, options?: { try_instant_view?: boolean }) => void
+  openTelegramLink: (url: string) => void
   showPopup: (params: { title?: string; message: string; buttons?: Array<{ id?: string; type?: string; text?: string }> }, callback?: (buttonId: string) => void) => void
   showAlert: (message: string, callback?: () => void) => void
   showConfirm: (message: string, callback?: (confirmed: boolean) => void) => void
@@ -120,4 +121,15 @@ export function hapticSuccess() {
 export function getImageUrl(path: string): string {
   if (path.startsWith('http')) return path
   return path
+}
+
+// Open bot with deep link (closes mini app)
+export function openBotDeepLink(botUsername: string, payload: string) {
+  const tg = getTelegram()
+  const url = `https://t.me/${botUsername}?start=${payload}`
+  if (tg?.openTelegramLink) {
+    tg.openTelegramLink(url)
+  } else {
+    window.open(url, '_blank')
+  }
 }
