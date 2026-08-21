@@ -21,6 +21,7 @@ type Props = {
 export function OrdersPage({ orders, cartCount, onSearch, onOpenCart }: Props) {
   const [active, setActive] = useState('Barchasi')
   const [newest, setNewest] = useState(true)
+  const [expandedId, setExpandedId] = useState<string | null>(null)
 
   const filtered = useMemo(() => {
     if (active === 'Barchasi') return orders
@@ -89,9 +90,14 @@ export function OrdersPage({ orders, cartCount, onSearch, onOpenCart }: Props) {
       <section className="space-y-4 px-5 pb-32 pt-6 sm:px-10">
         {shown.map((order, i) => {
           const payInfo = getPayInfo(order)
+          const isExpanded = expandedId === order.id
+          
           return (
             <div key={order.id} className="order-card flex-col gap-3" style={{ animationDelay: `${i * 0.08}s` }}>
-              <div className="flex flex-col gap-3">
+              <div 
+                className="flex flex-col gap-3 cursor-pointer" 
+                onClick={() => setExpandedId(isExpanded ? null : order.id)}
+              >
                 {/* Header row */}
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex-1 min-w-0">
@@ -99,14 +105,14 @@ export function OrdersPage({ orders, cartCount, onSearch, onOpenCart }: Props) {
                       {order.products.map(p => p.product.name).join(', ')}
                     </h3>
                     <p className="mt-1 text-xs font-bold" style={{ color: '#64748b' }}>Buyurtma ID: {order.id}</p>
-                    <p className="mt-0.5 text-xs" style={{ color: '#94a3b8' }}>{order.date}</p>
+                    <p className="mt-0.5 text-[11px]" style={{ color: '#94a3b8' }}>{order.date}</p>
                   </div>
 
                   <div className="flex flex-col items-end text-right shrink-0">
-                    <p className="text-lg font-extrabold sm:text-xl" style={{ color: '#111426' }}>
+                    <p className="text-base font-extrabold sm:text-lg" style={{ color: '#111426' }}>
                       {formatPrice(order.total)}
                     </p>
-                    <p className="mt-1 text-sm font-semibold" style={{ color: getStatusColor(order.status) }}>
+                    <p className="mt-1 text-xs font-semibold" style={{ color: getStatusColor(order.status) }}>
                       {order.status}
                     </p>
                     {payInfo && !payInfo.needsAction && (
@@ -120,8 +126,16 @@ export function OrdersPage({ orders, cartCount, onSearch, onOpenCart }: Props) {
                   </div>
                 </div>
 
-                {/* Products List */}
-                <div className="mt-2 space-y-2 border-t border-slate-100 pt-3">
+                {/* Toggle text */}
+                <div className="flex items-center justify-center text-xs font-bold mt-1" style={{ color: '#7c3aed' }}>
+                  {isExpanded ? 'Yashirish' : 'Tafsilotlarni ko\'rish'}
+                  <ChevronDown size={14} className={`ml-1 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+                </div>
+              </div>
+
+              {/* Products List */}
+              {isExpanded && (
+                <div className="mt-2 space-y-2 border-t border-slate-100 pt-3" style={{ animation: 'fadeIn 0.3s ease' }}>
                   {order.products.map((item, idx) => (
                     <div key={idx} className="flex gap-3 items-center">
                       <img
@@ -140,7 +154,7 @@ export function OrdersPage({ orders, cartCount, onSearch, onOpenCart }: Props) {
                     </div>
                   ))}
                 </div>
-              </div>
+              )}
 
               {/* Chek yuborish tugmasi — faqat Karta + to'lanmagan */}
               {payInfo?.needsAction && (
