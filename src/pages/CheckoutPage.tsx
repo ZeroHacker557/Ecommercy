@@ -18,7 +18,7 @@ let DefaultIcon = L.icon({
 L.Marker.prototype.options.icon = DefaultIcon
 
 type Props = {
-  cartProducts: { product: Product; quantity: number }[]
+  cartProducts: { product: Product; quantity: number; size?: string; color?: string; cartKey: string }[]
   cartTotal: number
   orderForm: OrderForm
   onUpdateForm: (field: keyof OrderForm, value: any) => void
