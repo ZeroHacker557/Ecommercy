@@ -28,7 +28,7 @@ a { color: inherit; text-decoration: none; }
   margin: 0 auto;
   min-height: 100dvh;
   max-width: 1120px;
-  overflow: hidden;
+  overflow-x: hidden;
   background: #fff;
   color: #111426;
   box-shadow: 0 0 50px rgba(71, 39, 130, 0.05);
@@ -37,7 +37,7 @@ a { color: inherit; text-decoration: none; }
 /* ====== Animations ====== */
 @keyframes fadeInUp {
   from { opacity: 0; transform: translateY(18px); }
-  to { opacity: 1; transform: translateY(0); }
+  to { opacity: 1; transform: none; }
 }
 
 @keyframes fadeIn {
@@ -47,17 +47,17 @@ a { color: inherit; text-decoration: none; }
 
 @keyframes slideInRight {
   from { transform: translateX(100%); }
-  to { transform: translateX(0); }
+  to { transform: none; }
 }
 
 @keyframes slideInUp {
   from { transform: translateY(100%); }
-  to { transform: translateY(0); }
+  to { transform: none; }
 }
 
 @keyframes scaleIn {
   from { opacity: 0; transform: scale(0.92); }
-  to { opacity: 1; transform: scale(1); }
+  to { opacity: 1; transform: none; }
 }
 
 @keyframes bounceIn {
@@ -69,7 +69,7 @@ a { color: inherit; text-decoration: none; }
 
 @keyframes toastIn {
   from { opacity: 0; transform: translateY(-20px) scale(0.95); }
-  to { opacity: 1; transform: translateY(0) scale(1); }
+  to { opacity: 1; transform: none; }
 }
 
 @keyframes overlayIn {
